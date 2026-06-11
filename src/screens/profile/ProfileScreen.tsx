@@ -95,15 +95,21 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           <Text style={styles.statLabel}>Nhật ký</Text>
         </View>
         <View style={styles.statDivider} />
-        <View style={styles.statItem}>
+        <TouchableOpacity 
+          style={styles.statItem}
+          onPress={() => navigation.navigate('Follows', { initialTab: 'followers' })}
+        >
           <Text style={styles.statValue}>{user.followers_count}</Text>
           <Text style={styles.statLabel}>Người theo dõi</Text>
-        </View>
+        </TouchableOpacity>
         <View style={styles.statDivider} />
-        <View style={styles.statItem}>
+        <TouchableOpacity 
+          style={styles.statItem}
+          onPress={() => navigation.navigate('Follows', { initialTab: 'following' })}
+        >
           <Text style={styles.statValue}>{user.following_count}</Text>
           <Text style={styles.statLabel}>Đang theo dõi</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Plan Badge */}

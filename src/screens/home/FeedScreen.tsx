@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DiaryPostCard } from '../../components/DiaryPostCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
+import { SuggestedUsers } from '../../components/SuggestedUsers';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
@@ -78,8 +79,17 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
           <Text style={styles.headerTitle}>WanderLab</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIcon}>
+          <TouchableOpacity 
+            style={styles.headerIcon}
+            onPress={() => navigation.navigate('Notifications')}
+          >
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIcon}
+            onPress={() => navigation.navigate('MessageList')}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -88,7 +98,11 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
       <View style={styles.storiesContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
           {/* Create Story */}
-          <TouchableOpacity style={styles.storyItem} activeOpacity={0.8}>
+          <TouchableOpacity 
+            style={styles.storyItem} 
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('CreateDiary')}
+          >
             <View style={[styles.storyImageContainer, styles.createStory]}>
               <LinearGradient colors={['#f3f4f6', '#e5e7eb']} style={styles.createStoryBg}>
                 <View style={styles.createStoryIcon}>
@@ -103,6 +117,8 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
           ))}
         </ScrollView>
       </View>
+
+      <SuggestedUsers />
 
       {/* Feed Title */}
       <View style={styles.feedHeader}>

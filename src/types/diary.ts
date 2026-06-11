@@ -90,3 +90,19 @@ export interface DiaryDetail {
   budgetNotes: string[];
   tips: string[];
 }
+
+export interface CreateDiaryPayload {
+  title: string;
+  location: string;
+  country: string;
+  duration: string;
+  dates: string;
+  total_budget: string;
+  group_size: string;
+  description: string;
+  status: DiaryStatus;
+  tips?: string[];
+  budget_notes?: string[];
+  timeline?: DiaryDay[];
+  budget_breakdown?: BudgetItem[];
+}

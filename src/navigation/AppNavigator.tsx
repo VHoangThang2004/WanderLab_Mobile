@@ -11,8 +11,18 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { FeedScreen } from '../screens/home/FeedScreen';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
+// Diary Screens
 import { DiaryDetailScreen } from '../screens/diary/DiaryDetailScreen';
+import { CreateDiaryScreen } from '../screens/diary/CreateDiaryScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { FollowsScreen } from '../screens/profile/FollowsScreen';
+
+// Message Screens
+import { MessageListScreen } from '../screens/messages/MessageListScreen';
+import { ChatScreen } from '../screens/messages/ChatScreen';
+
+// Notification Screen
+import { NotificationScreen } from '../screens/notifications/NotificationScreen';
 
 // Auth store
 import { useAuthStore } from '../stores/authStore';
@@ -22,6 +32,7 @@ const AuthStack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
 const ExploreStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
+const MainStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function HomeStackNavigator() {
@@ -47,6 +58,7 @@ function ProfileStackNavigator() {
     <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
+      <ProfileStack.Screen name="Follows" component={FollowsScreen} />
     </ProfileStack.Navigator>
   );
 }
@@ -118,6 +130,22 @@ function MainTabs() {
   );
 }
 
+function MainNavigator() {
+  return (
+    <MainStack.Navigator screenOptions={{ headerShown: false }}>
+      <MainStack.Screen name="MainTabs" component={MainTabs} />
+      <MainStack.Screen name="MessageList" component={MessageListScreen} />
+      <MainStack.Screen name="Chat" component={ChatScreen} />
+      <MainStack.Screen name="Notifications" component={NotificationScreen} />
+      <MainStack.Screen 
+        name="CreateDiary" 
+        component={CreateDiaryScreen} 
+        options={{ presentation: 'fullScreenModal' }}
+      />
+    </MainStack.Navigator>
+  );
+}
+
 function AuthNavigator() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
@@ -132,7 +160,7 @@ export function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainTabs /> : <AuthNavigator />}
+      {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 }

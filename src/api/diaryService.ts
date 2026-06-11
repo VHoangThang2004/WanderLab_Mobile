@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { DiaryFeedItem, DiaryExploreItem, DiaryDetail } from '../types/diary';
+import type { DiaryFeedItem, DiaryExploreItem, DiaryDetail, CreateDiaryPayload } from '../types/diary';
 
 export const diaryService = {
   async fetchFeedDiaries(): Promise<DiaryFeedItem[]> {
@@ -203,4 +203,89 @@ export const diaryService = {
     }
     return [];
   },
+
+  /**
+   * Upload ảnh bìa lên Supabase Storage bucket 'diaries'
+   */
+  async uploadDiaryImage(uri: string): Promise<string> {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const fileExt = uri.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const filePath = `covers/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('diaries')
+        .upload(filePath, blob, {
+          contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('diaries').getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (e) {
+      console.warn("Error uploading image:", e);
+      throw e;
+    }
+  },
+
+  /**
+   * Tạo nhật ký mới vào DB
+   */
+  async createDiary(payload: CreateDiaryPayload, coverImageUrl: string): Promise<string> {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('User not authenticated');
+
+    // 1. Insert diary record
+    const { data: diary, error: diaryError } = await supabase
+      .from('diaries')
+      .insert({
+        user_id: userData.user.id,
+        title: payload.title,
+        location: payload.location,
+        country: payload.country,
+        cover_image_url: coverImageUrl,
+        duration: payload.duration,
+        dates: payload.dates,
+        total_budget: payload.total_budget,
+        group_size: payload.group_size,
+        description: payload.description,
+        status: payload.status,
+        tips: payload.tips || [],
+        budget_notes: payload.budget_notes || [],
+      })
+      .select('id')
+      .single();
+
+    if (diaryError) throw diaryError;
+    const diaryId = diary.id;
+
+    // 2. Insert diary_days
+    if (payload.timeline && payload.timeline.length > 0) {
+      const daysToInsert = payload.timeline.map((day) => ({
+        diary_id: diaryId,
+        day_number: day.day,
+        title: day.title,
+        activities: day.activities,
+        budget: day.budget,
+      }));
+      await supabase.from('diary_days').insert(daysToInsert);
+    }
+
+    // 3. Insert budget_items
+    if (payload.budget_breakdown && payload.budget_breakdown.length > 0) {
+      const budgetToInsert = payload.budget_breakdown.map((item) => ({
+        diary_id: diaryId,
+        category: item.category,
+        amount: item.amount,
+        percentage: item.percentage,
+      }));
+      await supabase.from('diary_budget_breakdown').insert(budgetToInsert);
+    }
+
+    return diaryId;
+  }
 };
