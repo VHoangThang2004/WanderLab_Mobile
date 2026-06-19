@@ -25,10 +25,23 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
   const { user } = useAuthStore();
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   const { data: diary, isLoading } = useQuery({
     queryKey: ['diary', id],
     queryFn: () => diaryService.fetchDiaryById(id),
+  });
+
+  // Check follow status when diary loads
+  useQuery({
+    queryKey: ['checkFollow', user?.id, diary?.author?.id],
+    queryFn: async () => {
+      if (!user || !diary?.author?.id) return false;
+      const following = await interactionService.checkIsFollowing(user.id, diary.author.id);
+      setIsFollowing(following);
+      return following;
+    },
+    enabled: !!user && !!diary?.author?.id,
   });
 
   const handleLike = async () => {
@@ -51,6 +64,40 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
     }
   };
 
+  const handleFollow = async () => {
+    if (!user || !diary) return;
+    setIsFollowing(!isFollowing);
+    try {
+      await interactionService.toggleFollowUser(user.id, diary.author.id);
+    } catch (e) {
+      setIsFollowing(isFollowing);
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Xóa nhật ký",
+      "Bạn có chắc chắn muốn xóa nhật ký này không? Hành động này không thể hoàn tác.",
+      [
+        { text: "Hủy", style: "cancel" },
+        { 
+          text: "Xóa", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await diaryService.deleteDiary(id);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert("Lỗi", "Không thể xóa nhật ký lúc này.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const isAuthor = user?.id === diary?.author?.id;
+
   if (isLoading || !diary) {
     return <LoadingSpinner />;
   }
@@ -64,6 +111,11 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
+        {isAuthor && (
+          <TouchableOpacity style={styles.optionsButton} onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
         <View style={styles.heroBottom}>
           <Text style={styles.heroTitle}>{diary.title || diary.location}</Text>
           <View style={styles.heroMeta}>
@@ -84,11 +136,19 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.followBtn}>
-          <LinearGradient colors={gradients.primary} style={styles.followGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={styles.followText}>Theo dõi</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {!isAuthor && (
+          <TouchableOpacity style={styles.followBtn} onPress={handleFollow}>
+            <LinearGradient 
+              colors={isFollowing ? ['#e5e7eb', '#e5e7eb'] : gradients.primary} 
+              style={styles.followGradient} 
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            >
+              <Text style={[styles.followText, isFollowing && { color: colors.textSecondary }]}>
+                {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Trust Score & Info */}
@@ -197,7 +257,7 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
             {diary.likesCount + (isLiked ? 1 : 0)}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Comment', { diaryId: diary.id })}>
           <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
           <Text style={styles.actionLabel}>{diary.commentsCount}</Text>
         </TouchableOpacity>
@@ -224,6 +284,11 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 50, left: spacing.base,
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center',
+  },
+  optionsButton: {
+    position: 'absolute', top: 50, right: spacing.base,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,59,48,0.8)', justifyContent: 'center', alignItems: 'center',
   },
   heroBottom: { position: 'absolute', bottom: spacing.lg, left: spacing.base, right: spacing.base },
   heroTitle: { fontSize: typography['2xl'], fontWeight: typography.bold, color: '#fff', marginBottom: 4 },

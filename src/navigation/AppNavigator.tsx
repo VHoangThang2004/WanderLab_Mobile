@@ -14,6 +14,7 @@ import { ExploreScreen } from '../screens/explore/ExploreScreen';
 // Diary Screens
 import { DiaryDetailScreen } from '../screens/diary/DiaryDetailScreen';
 import { CreateDiaryScreen } from '../screens/diary/CreateDiaryScreen';
+import { CommentScreen } from '../screens/diary/CommentScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { FollowsScreen } from '../screens/profile/FollowsScreen';
 
@@ -23,6 +24,12 @@ import { ChatScreen } from '../screens/messages/ChatScreen';
 
 // Notification Screen
 import { NotificationScreen } from '../screens/notifications/NotificationScreen';
+
+// Phase 3 Screens (AI & Payment)
+import { CreateItineraryScreen } from '../screens/itinerary/CreateItineraryScreen';
+import { AIAssistantScreen } from '../screens/ai/AIAssistantScreen';
+import { SubscriptionScreen } from '../screens/subscription/SubscriptionScreen';
+import { CheckoutScreen } from '../screens/subscription/CheckoutScreen';
 
 // Auth store
 import { useAuthStore } from '../stores/authStore';
@@ -142,6 +149,12 @@ function MainNavigator() {
         component={CreateDiaryScreen} 
         options={{ presentation: 'fullScreenModal' }}
       />
+      <MainStack.Screen name="Comment" component={CommentScreen} options={{ presentation: 'modal' }} />
+      {/* Phase 3 Screens */}
+      <MainStack.Screen name="CreateItinerary" component={CreateItineraryScreen} />
+      <MainStack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ presentation: 'modal' }} />
+      <MainStack.Screen name="Subscription" component={SubscriptionScreen} options={{ presentation: 'fullScreenModal' }} />
+      <MainStack.Screen name="Checkout" component={CheckoutScreen} />
     </MainStack.Navigator>
   );
 }

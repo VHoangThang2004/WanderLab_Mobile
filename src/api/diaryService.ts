@@ -287,5 +287,138 @@ export const diaryService = {
     }
 
     return diaryId;
+  },
+
+  /**
+   * Lấy danh sách nhật ký đã lưu (bookmarked) của user
+   */
+  async fetchSavedDiaries(userId: string): Promise<DiaryFeedItem[]> {
+    try {
+      const { data, error } = await supabase
+        .from('diary_bookmarks')
+        .select(`
+          diary:diaries(
+            id,
+            location,
+            cover_image_url,
+            created_at,
+            description,
+            group_size,
+            likes_count,
+            comments_count,
+            author:profiles!diaries_user_id_fkey(id, full_name, avatar_url),
+            diary_likes(user_id)
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Supabase fetch saved diaries error:', error);
+      } else if (data) {
+        return data
+          .map((item: any) => item.diary)
+          .filter(Boolean)
+          .map((item: any) => ({
+            id: item.id,
+            author: {
+              id: item.author?.id || 'unknown',
+              name: item.author?.full_name || 'Unknown User',
+              avatar: item.author?.avatar_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200',
+            },
+            image: item.cover_image_url || 'https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=600',
+            location: item.location,
+            date: new Date(item.created_at).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' }),
+            caption: item.description,
+            likes: item.likes_count || 0,
+            comments: item.comments_count || 0,
+            is_liked: item.diary_likes?.some((l: any) => l.user_id === userId) || false,
+            is_saved: true,
+            group_size: item.group_size || '',
+          }));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch saved diaries from Supabase", err);
+    }
+    return [];
+  },
+
+  /**
+   * Cập nhật nhật ký
+   */
+  async updateDiary(id: string, payload: Partial<CreateDiaryPayload>, coverImageUrl?: string): Promise<void> {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('User not authenticated');
+
+    const updateData: any = {
+      title: payload.title,
+      location: payload.location,
+      country: payload.country,
+      duration: payload.duration,
+      dates: payload.dates,
+      total_budget: payload.total_budget,
+      group_size: payload.group_size,
+      description: payload.description,
+      status: payload.status,
+      tips: payload.tips,
+      budget_notes: payload.budget_notes,
+    };
+    
+    if (coverImageUrl) {
+      updateData.cover_image_url = coverImageUrl;
+    }
+
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+    const { error } = await supabase
+      .from('diaries')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', userData.user.id);
+
+    if (error) throw error;
+
+    if (payload.timeline) {
+      await supabase.from('diary_days').delete().eq('diary_id', id);
+      if (payload.timeline.length > 0) {
+        const daysToInsert = payload.timeline.map((day) => ({
+          diary_id: id,
+          day_number: day.day,
+          title: day.title,
+          activities: day.activities,
+          budget: day.budget,
+        }));
+        await supabase.from('diary_days').insert(daysToInsert);
+      }
+    }
+
+    if (payload.budget_breakdown) {
+      await supabase.from('diary_budget_breakdown').delete().eq('diary_id', id);
+      if (payload.budget_breakdown.length > 0) {
+        const budgetToInsert = payload.budget_breakdown.map((item) => ({
+          diary_id: id,
+          category: item.category,
+          amount: item.amount,
+          percentage: item.percentage,
+        }));
+        await supabase.from('diary_budget_breakdown').insert(budgetToInsert);
+      }
+    }
+  },
+
+  /**
+   * Xóa nhật ký
+   */
+  async deleteDiary(id: string): Promise<void> {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('diaries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userData.user.id);
+
+    if (error) throw error;
   }
 };
