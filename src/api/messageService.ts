@@ -5,6 +5,9 @@ export interface ChatMessage {
   sender_id: string;
   receiver_id: string;
   content: string;
+  media_url?: string;
+  media_type?: string;
+  reactions?: Record<string, string[]>;
   status: 'sent' | 'delivered' | 'read';
   created_at: string;
 }
@@ -97,16 +100,15 @@ export const messageService = {
     return data as ChatMessage[];
   },
 
-  /**
-   * Send a new message
-   */
-  async sendMessage(senderId: string, receiverId: string, content: string): Promise<ChatMessage | null> {
+  async sendMessage(senderId: string, receiverId: string, content: string, mediaUrl?: string, mediaType?: string): Promise<ChatMessage | null> {
     const { data, error } = await supabase
       .from('messages')
       .insert({
         sender_id: senderId,
         receiver_id: receiverId,
         content,
+        media_url: mediaUrl,
+        media_type: mediaType,
         status: 'sent'
       })
       .select()
@@ -121,6 +123,70 @@ export const messageService = {
   },
 
   /**
+   * Upload media to storage (React Native adaptation)
+   */
+  async uploadChatMedia(uri: string, type: string = 'image/jpeg'): Promise<{ url: string; type: string } | null> {
+    try {
+      const fileExt = uri.split('.').pop() || 'jpg';
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat_media')
+        .upload(filePath, blob, {
+          contentType: type,
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return null;
+      }
+
+      const { data } = supabase.storage.from('chat_media').getPublicUrl(filePath);
+      return {
+        url: data.publicUrl,
+        type: type.startsWith('image/') ? 'image' : 'file'
+      };
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      return null;
+    }
+  },
+
+  /**
+   * React to a message
+   */
+  async reactToMessage(messageId: string, userId: string, reaction: string): Promise<void> {
+    // First, get the current reactions
+    const { data: msg } = await supabase.from('messages').select('reactions').eq('id', messageId).single();
+    if (!msg) return;
+
+    let reactions: Record<string, string[]> = msg.reactions || {};
+    
+    // Toggle reaction logic
+    if (reactions[reaction]) {
+      if (reactions[reaction].includes(userId)) {
+        reactions[reaction] = reactions[reaction].filter(id => id !== userId);
+        if (reactions[reaction].length === 0) {
+          delete reactions[reaction];
+        }
+      } else {
+        reactions[reaction].push(userId);
+      }
+    } else {
+      reactions[reaction] = [userId];
+    }
+
+    const { error } = await supabase.from('messages').update({ reactions }).eq('id', messageId);
+    if (error) {
+      console.error("Error reacting to message:", error);
+    }
+  },
+
+  /**
    * Mark messages as read
    */
   async markAsRead(receiverId: string, senderId: string): Promise<void> {
@@ -129,10 +195,40 @@ export const messageService = {
       .update({ status: 'read' })
       .eq('receiver_id', receiverId)
       .eq('sender_id', senderId)
-      .eq('status', 'delivered');
+      .neq('status', 'read');
 
     if (error) {
       console.error("Error marking messages as read:", error);
     }
+  },
+
+  /**
+   * Subscribe to messages in real-time
+   */
+  subscribeToMessages(userId: string, onNewMessage: (payload: any) => void) {
+    if (!userId) return null;
+
+    const channelName = `messages_sync_${userId}_${Math.random().toString(36).substring(7)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        (payload) => {
+          const record = (payload.new && Object.keys(payload.new as object).length > 0) ? payload.new : payload.old;
+          const typedRecord = record as Record<string, any>;
+          // Ensure the message involves the current user
+          if (typedRecord && (typedRecord.receiver_id === userId || typedRecord.sender_id === userId)) {
+            onNewMessage(payload);
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`Realtime synced for user: ${userId}`);
+        }
+      });
+
+    return channel;
   }
 };

@@ -75,8 +75,8 @@ export function AIAssistantScreen({ navigation }: any) {
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
         <FlatList
           ref={flatListRef}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Share } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,6 +12,7 @@ interface DiaryPostCardProps extends DiaryFeedItem {
   onPress?: () => void;
   onLikePress?: () => void;
   onBookmarkPress?: () => void;
+  onCommentPress?: () => void;
 }
 
 export function DiaryPostCard({
@@ -27,6 +28,7 @@ export function DiaryPostCard({
   onPress,
   onLikePress,
   onBookmarkPress,
+  onCommentPress,
 }: DiaryPostCardProps) {
   const [liked, setLiked] = useState(is_liked);
   const [saved, setSaved] = useState(is_saved);
@@ -41,6 +43,16 @@ export function DiaryPostCard({
   const handleBookmark = () => {
     setSaved(!saved);
     onBookmarkPress?.();
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Khám phá nhật ký hành trình "${caption}" của ${author.name} trên WanderLab!`,
+      });
+    } catch (error: any) {
+      console.warn('Lỗi chia sẻ:', error.message);
+    }
   };
 
   return (
@@ -99,11 +111,11 @@ export function DiaryPostCard({
             />
             <Text style={[styles.actionCount, liked && { color: colors.primary }]}>{likesCount}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity style={styles.actionBtn} onPress={onCommentPress}>
             <Ionicons name="chatbubble-outline" size={22} color={colors.textSecondary} />
             <Text style={styles.actionCount}>{comments}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
             <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>

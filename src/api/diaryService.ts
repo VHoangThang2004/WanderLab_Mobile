@@ -209,23 +209,25 @@ export const diaryService = {
    */
   async uploadDiaryImage(uri: string): Promise<string> {
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
       const fileExt = uri.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const filePath = `covers/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: fileName,
+        type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`
+      } as any);
+
+      const { data, error: uploadError } = await supabase.storage
         .from('diaries')
-        .upload(filePath, blob, {
-          contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`
-        });
+        .upload(filePath, formData);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('diaries').getPublicUrl(filePath);
-      return data.publicUrl;
+      const { data: publicUrlData } = supabase.storage.from('diaries').getPublicUrl(filePath);
+      return publicUrlData.publicUrl;
     } catch (e) {
       console.warn("Error uploading image:", e);
       throw e;

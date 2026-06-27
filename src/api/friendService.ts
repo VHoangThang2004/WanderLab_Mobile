@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { notificationService } from './notificationService';
 
 export interface FriendProfile {
   id: string;
@@ -25,6 +26,38 @@ export const friendService = {
     if (error) {
       throw error;
     }
+
+    // Lấy thông tin user gửi để làm nội dung
+    const { data: sender } = await supabase.from('profiles').select('full_name').eq('id', followerId).single();
+    const senderName = sender?.full_name || 'Ai đó';
+
+    // Check if it's mutual (following back means accepting request)
+    const isMutual = await this.checkIsFollowing(followingId, followerId);
+    if (isMutual) {
+      await notificationService.createNotification(
+        followingId, 
+        followerId, 
+        'friend_accept', 
+        `${senderName} đã chấp nhận lời mời kết bạn của bạn.`,
+        followerId
+      );
+      // Gửi ngược lại cho người chấp nhận
+      await notificationService.createNotification(
+        followerId, 
+        followingId, 
+        'friend_accept', 
+        `Bạn và ${senderName} đã trở thành bạn bè.`,
+        followingId
+      );
+    } else {
+      await notificationService.createNotification(
+        followingId, 
+        followerId, 
+        'friend_request', 
+        `${senderName} đã gửi cho bạn một lời mời kết bạn.`,
+        followerId
+      );
+    }
   },
 
   /**
@@ -34,12 +67,29 @@ export const friendService = {
     const { error } = await supabase
       .from('follows')
       .delete()
-      .eq('follower_id', followerId)
-      .eq('following_id', followingId);
+      .match({ follower_id: followerId, following_id: followingId });
 
     if (error) {
       throw error;
     }
+  },
+
+  /**
+   * Remove a mutual friend (delete both follow edges)
+   */
+  async removeFriend(userId: string, friendId: string): Promise<void> {
+    const { error: err1 } = await supabase
+      .from('follows')
+      .delete()
+      .match({ follower_id: userId, following_id: friendId });
+
+    const { error: err2 } = await supabase
+      .from('follows')
+      .delete()
+      .match({ follower_id: friendId, following_id: userId });
+
+    if (err1) throw err1;
+    if (err2) throw err2;
   },
 
   /**
@@ -152,29 +202,46 @@ export const friendService = {
   /**
    * Fetch suggested friends (profiles that are not currently followed by the user)
    */
-  async fetchSuggestedFriends(userId: string) {
+  async fetchSuggestedFriends(userId: string, searchQuery: string = '') {
     if (!userId) return [];
 
-    // Fetch whom the user follows to exclude them
+    // Fetch whom the user follows
     const { data: following } = await supabase
       .from('follows')
       .select('following_id')
       .eq('follower_id', userId);
       
-    const followingIds = new Set((following || []).map(f => f.following_id));
-    followingIds.add(userId); // Exclude self
+    // Fetch who follows the user
+    const { data: followers } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('following_id', userId);
 
-    // Fetch top 10 profiles not in followingIds
-    const { data: profiles, error } = await supabase
+    const excludedIds = new Set([
+      userId,
+      ...(following || []).map(f => f.following_id),
+      ...(followers || []).map(f => f.follower_id)
+    ]);
+
+    let query = supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, location, diaries_count, followers_count, following_count')
-      .limit(20);
+      .select('id, full_name, avatar_url, location, diaries_count, followers_count, following_count');
+
+    if (searchQuery.trim()) {
+      // Search by name if query is provided
+      query = query.ilike('full_name', `%${searchQuery.trim()}%`).limit(20);
+    } else {
+      // Otherwise just get random recent profiles
+      query = query.limit(20);
+    }
+
+    const { data: profiles, error } = await query;
 
     if (error) {
       console.warn("Error fetching suggested friends:", error);
       return [];
     }
 
-    return (profiles || []).filter(p => !followingIds.has(p.id)).slice(0, 10);
+    return (profiles || []).filter(p => !excludedIds.has(p.id));
   }
 };

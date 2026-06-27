@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, ScrollView,
   TouchableOpacity, Platform, ActivityIndicator, KeyboardAvoidingView, Alert, Modal, FlatList
@@ -7,9 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { diaryService } from '../../api/diaryService';
-import { CreateDiaryPayload } from '../../types/diary';
+import { CreateDiaryPayload, DiaryDetail } from '../../types/diary';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -24,32 +24,55 @@ const PROVINCES = [
   "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
 ];
 
-export function CreateDiaryScreen() {
+export function EditDiaryScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const diary: DiaryDetail = route.params?.diary;
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!diary) {
+      Alert.alert('Lỗi', 'Không tìm thấy nhật ký để sửa.', [
+        { text: 'Quay lại', onPress: () => navigation.goBack() }
+      ]);
+    }
+  }, [diary, navigation]);
+
   // Step 1: Basic Info
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [location, setLocation] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(diary?.image || null);
+  const [title, setTitle] = useState(diary?.title || '');
+  const [location, setLocation] = useState(diary?.location || '');
+  const [startDate, setStartDate] = useState(diary?.dates?.split(' - ')[0] || '');
+  const [endDate, setEndDate] = useState(diary?.dates?.split(' - ')[1] || '');
   const [style, setStyle] = useState('');
   
   // Step 2: Budget & Group
-  const [budget, setBudget] = useState('');
-  const [groupSize, setGroupSize] = useState('1');
-  const [description, setDescription] = useState('');
+  const initialBudget = diary?.totalBudget ? diary.totalBudget.replace(/\D/g, '') : '';
+  const initialGroupSize = diary?.groupSize ? diary.groupSize.replace(/\D/g, '') : '1';
+
+  const [budget, setBudget] = useState(initialBudget);
+  const [groupSize, setGroupSize] = useState(initialGroupSize);
+  const [description, setDescription] = useState(diary?.description || '');
 
   // Step 3: Timeline & Media
-  const [timeline, setTimeline] = useState<any[]>([
-    { day: 1, title: '', activities: [''], budget: '' }
-  ]);
+  const [timeline, setTimeline] = useState<any[]>(
+    diary?.timeline && diary.timeline.length > 0
+      ? diary.timeline.map((day: any) => ({
+          day: day.day,
+          title: day.title || '',
+          activities: day.activities && day.activities.length > 0 ? day.activities : [''],
+          budget: day.budget ? day.budget.replace(/\D/g, '') : '',
+        }))
+      : [{ day: 1, title: '', activities: [''], budget: '' }]
+  );
 
   // Step 4: Privacy
-  const [privacy, setPrivacy] = useState<'public' | 'friends' | 'private'>('public');
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [privacy, setPrivacy] = useState<'public' | 'friends' | 'private'>(
+    diary?.status === 'draft' ? 'private' : 'public'
+  );
+  const [agreedToTerms, setAgreedToTerms] = useState(true); // Default true when editing
 
   // Modals & Pickers
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -110,7 +133,7 @@ export function CreateDiaryScreen() {
   };
 
   const validateStep1 = () => {
-    if (!title || !location || !startDate || !endDate || !style || !imageUri) {
+    if (!title || !location || !startDate || !endDate || !imageUri) {
       Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ các mục bắt buộc ở Bước 1.');
       return false;
     }
@@ -118,8 +141,8 @@ export function CreateDiaryScreen() {
   };
 
   const validateStep2 = () => {
-    if (!budget || !groupSize || !description) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ ngân sách, số người và mô tả chuyến đi.');
+    if (!groupSize || !description) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ số người và mô tả chuyến đi.');
       return false;
     }
     return true;
@@ -139,12 +162,15 @@ export function CreateDiaryScreen() {
     else if (step === 3) setStep(4);
   };
 
-  const handleCreate = async () => {
-    if (!validateStep4()) return;
+  const handleUpdate = async () => {
+    if (!validateStep4() || !diary) return;
     
     setLoading(true);
     try {
-      const coverUrl = await diaryService.uploadDiaryImage(imageUri!);
+      let coverUrl = undefined;
+      if (imageUri && !imageUri.startsWith('http')) {
+        coverUrl = await diaryService.uploadDiaryImage(imageUri);
+      }
       
       const timelineFormatted = timeline.map(day => ({
         day: day.day,
@@ -154,34 +180,27 @@ export function CreateDiaryScreen() {
         images: [], videos: [], audios: []
       }));
 
-      const payload: CreateDiaryPayload = {
+      const payload: Partial<CreateDiaryPayload> = {
         title,
         location,
         country: 'Việt Nam',
         duration: `${timeline.length} ngày`,
         dates: `${startDate} - ${endDate}`,
-        total_budget: `${(parseInt(budget) / 1000000).toFixed(1)} triệu ₫`,
+        total_budget: budget ? `${(parseInt(budget) / 1000000).toFixed(1)} triệu ₫` : diary.totalBudget,
         group_size: `${groupSize} người`,
         description,
         status: privacy === 'private' ? 'draft' : 'published',
-        tips: ["Mang theo đồ cá nhân", "Chuẩn bị tiền mặt"],
-        budget_notes: ["Giá cả có thể thay đổi"],
         timeline: timelineFormatted,
-        budget_breakdown: [
-          { category: "Di chuyển", amount: "Vừa phải", percentage: 30 },
-          { category: "Ăn uống", amount: "Phải chăng", percentage: 40 },
-          { category: "Lưu trú", amount: "Giá rẻ", percentage: 30 },
-        ]
       };
 
-      await diaryService.createDiary(payload, coverUrl);
+      await diaryService.updateDiary(diary.id, payload, coverUrl);
       
-      Alert.alert('Thành công', 'Bài viết đã được tạo thành công!', [
+      Alert.alert('Thành công', 'Bài viết đã được cập nhật thành công!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (e: any) {
       console.warn(e);
-      Alert.alert('Lỗi', 'Không thể tạo bài viết: ' + (e.message || JSON.stringify(e)));
+      Alert.alert('Lỗi', 'Không thể cập nhật bài viết: ' + (e.message || JSON.stringify(e)));
     } finally {
       setLoading(false);
     }
@@ -275,10 +294,10 @@ export function CreateDiaryScreen() {
           </TouchableOpacity>
           <View style={{alignItems: 'center'}}>
             <View style={styles.notebookBadge}>
-              <Ionicons name="book" size={14} color="#ff3131" style={{marginRight: 4}} />
-              <Text style={styles.notebookBadgeText}>Sổ Tay Du Lịch</Text>
+              <Ionicons name="create" size={14} color="#ff3131" style={{marginRight: 4}} />
+              <Text style={styles.notebookBadgeText}>Chỉnh Sửa</Text>
             </View>
-            <Text style={styles.headerTitle}>Tạo Nhật Ký Mới</Text>
+            <Text style={styles.headerTitle}>Sửa Nhật Ký</Text>
           </View>
           <View style={{ width: 40 }} />
         </View>
@@ -562,11 +581,11 @@ export function CreateDiaryScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.nextBtn} onPress={handleCreate} disabled={loading}>
+                <TouchableOpacity style={styles.nextBtn} onPress={handleUpdate} disabled={loading}>
                   {loading ? <ActivityIndicator color="#fff" /> : (
                     <>
-                      <Text style={styles.nextBtnText}>Hoàn thành & Chia sẻ</Text>
-                      <Ionicons name="sparkles" size={20} color="#fff" />
+                      <Text style={styles.nextBtnText}>Lưu & Cập Nhật</Text>
+                      <Ionicons name="checkmark-done" size={20} color="#fff" />
                     </>
                   )}
                 </TouchableOpacity>

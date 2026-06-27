@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Dimensions, Alert,
+  Dimensions, Alert, Share,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -98,13 +99,24 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
 
   const isAuthor = user?.id === diary?.author?.id;
 
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Khám phá nhật ký hành trình "${diary?.title || diary?.location}" của ${diary?.author?.name} trên WanderLab!`,
+      });
+    } catch (error: any) {
+      console.warn('Lỗi chia sẻ:', error.message);
+    }
+  };
+
   if (isLoading || !diary) {
     return <LoadingSpinner />;
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Image */}
+    <SafeAreaView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Hero Image */}
       <View style={styles.heroContainer}>
         <Image source={{ uri: diary.image }} style={styles.heroImage} contentFit="cover" transition={300} />
         <LinearGradient colors={['rgba(0,0,0,0.4)', 'transparent', 'rgba(0,0,0,0.7)']} style={StyleSheet.absoluteFill} />
@@ -112,9 +124,14 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         {isAuthor && (
-          <TouchableOpacity style={styles.optionsButton} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={20} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.authorActions}>
+            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditDiary', { diary })}>
+              <Ionicons name="pencil-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.optionsButton} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         )}
         <View style={styles.heroBottom}>
           <Text style={styles.heroTitle}>{diary.title || diary.location}</Text>
@@ -265,14 +282,15 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
           <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={isBookmarked ? colors.primary : colors.text} />
           <Text style={[styles.actionLabel, isBookmarked && { color: colors.primary }]}>Lưu</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
           <Ionicons name="share-outline" size={22} color={colors.text} />
           <Text style={styles.actionLabel}>Chia sẻ</Text>
         </TouchableOpacity>
       </View>
 
       <View style={{ height: spacing['3xl'] }} />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -285,8 +303,15 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center',
   },
-  optionsButton: {
+  authorActions: {
     position: 'absolute', top: 50, right: spacing.base,
+    flexDirection: 'row', gap: spacing.sm,
+  },
+  editButton: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center',
+  },
+  optionsButton: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,59,48,0.8)', justifyContent: 'center', alignItems: 'center',
   },

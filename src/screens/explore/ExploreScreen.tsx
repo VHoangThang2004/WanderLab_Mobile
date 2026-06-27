@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TextInput, FlatList,
   RefreshControl, TouchableOpacity, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { DiaryExploreCard } from '../../components/DiaryExploreCard';
@@ -116,7 +117,7 @@ export function ExploreScreen({ navigation }: ExploreScreenProps) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={filteredDiaries}
         keyExtractor={(item) => item.id}
@@ -147,7 +148,7 @@ export function ExploreScreen({ navigation }: ExploreScreenProps) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

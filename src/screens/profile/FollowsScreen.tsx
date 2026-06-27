@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { friendService, FriendProfile } from '../../api/friendService';
@@ -14,13 +15,21 @@ interface FollowsScreenProps {
 export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
   const { initialTab } = route.params || { initialTab: 'followers' };
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'followers' | 'following' | 'friends'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'followers' | 'following' | 'friends' | 'groups'>(initialTab);
   
   const [data, setData] = useState({
     followers: [] as FriendProfile[],
     following: [] as FriendProfile[],
     friends: [] as FriendProfile[],
     requests: [] as FriendProfile[],
+    groups: [
+      {
+        id: '1',
+        full_name: 'Phượt Miền Bắc',
+        avatar_url: 'https://images.unsplash.com/photo-1694152362587-99d77d21793b?w=200',
+        location: '248 thành viên',
+      }
+    ],
   });
   const [loading, setLoading] = useState(true);
 
@@ -46,6 +55,7 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
       case 'followers': return data.followers;
       case 'following': return data.following;
       case 'friends': return data.friends;
+      case 'groups': return data.groups;
       default: return [];
     }
   };
@@ -60,14 +70,21 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
         <Text style={styles.userName} numberOfLines={1}>{item.full_name}</Text>
         {item.location && <Text style={styles.userLocation}>{item.location}</Text>}
       </View>
-      <TouchableOpacity style={styles.actionBtn}>
+      <TouchableOpacity 
+        style={styles.actionBtn}
+        onPress={() => {
+          if (activeTab === 'groups') {
+            navigation.navigate('GroupDetail', { id: item.id });
+          }
+        }}
+      >
         <Text style={styles.actionBtnText}>Xem</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -101,6 +118,14 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
             Bạn bè ({data.friends.length})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'groups' && styles.activeTab]}
+          onPress={() => setActiveTab('groups')}
+        >
+          <Text style={[styles.tabText, activeTab === 'groups' && styles.activeTabText]}>
+            Nhóm
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -121,7 +146,7 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

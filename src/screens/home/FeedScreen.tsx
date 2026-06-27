@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, ScrollView,
   RefreshControl, TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -138,7 +139,7 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={feedDiaries}
         keyExtractor={(item) => item.id}
@@ -156,6 +157,7 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
             onPress={() => navigation.navigate('DiaryDetail', { id: item.id })}
             onLikePress={() => handleLike(item.id)}
             onBookmarkPress={() => handleBookmark(item.id)}
+            onCommentPress={() => navigation.navigate('Comment', { diaryId: item.id })}
           />
         )}
         refreshControl={
@@ -169,7 +171,22 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />
-    </View>
+
+      {/* Floating Action Bar */}
+      <View style={styles.floatingActionContainer}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateDiary')} activeOpacity={0.8}>
+          <Ionicons name="book-outline" size={20} color="#fff" />
+          <Text style={styles.actionBtnText}>Tạo Nhật Ký</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.actionDivider} />
+        
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateItinerary')} activeOpacity={0.8}>
+          <Ionicons name="map-outline" size={20} color="#fff" />
+          <Text style={styles.actionBtnText}>Tạo Lịch Trình</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -322,4 +339,39 @@ const styles = StyleSheet.create({
     fontSize: typography.xs,
     color: colors.textSecondary,
   },
+  // Floating Action Bar
+  floatingActionContainer: {
+    position: 'absolute',
+    bottom: 24,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    borderRadius: 30,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    alignItems: 'center',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  actionDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 4,
+  }
 });

@@ -78,7 +78,8 @@ export function CommentScreen({ route, navigation }: any) {
 
       <KeyboardAvoidingView 
         style={styles.flex1} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
         {isLoading ? (
           <View style={styles.center}>

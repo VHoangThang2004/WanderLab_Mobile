@@ -17,6 +17,11 @@ import { CreateDiaryScreen } from '../screens/diary/CreateDiaryScreen';
 import { CommentScreen } from '../screens/diary/CommentScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { FollowsScreen } from '../screens/profile/FollowsScreen';
+import { SettingsScreen } from '../screens/profile/SettingsScreen';
+import { PartnerScreen } from '../screens/profile/PartnerScreen';
+import { GroupDetailScreen } from '../screens/profile/GroupDetailScreen';
+import { DiaryBookScreen } from '../screens/diary/DiaryBookScreen';
+import { EditDiaryScreen } from '../screens/diary/EditDiaryScreen';
 
 // Message Screens
 import { MessageListScreen } from '../screens/messages/MessageListScreen';
@@ -46,7 +51,6 @@ function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Feed" component={FeedScreen} />
-      <HomeStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -55,7 +59,6 @@ function ExploreStackNavigator() {
   return (
     <ExploreStack.Navigator screenOptions={{ headerShown: false }}>
       <ExploreStack.Screen name="ExploreMain" component={ExploreScreen} />
-      <ExploreStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
     </ExploreStack.Navigator>
   );
 }
@@ -64,7 +67,6 @@ function ProfileStackNavigator() {
   return (
     <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
-      <ProfileStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
       <ProfileStack.Screen name="Follows" component={FollowsScreen} />
     </ProfileStack.Navigator>
   );
@@ -144,12 +146,14 @@ function MainNavigator() {
       <MainStack.Screen name="MessageList" component={MessageListScreen} />
       <MainStack.Screen name="Chat" component={ChatScreen} />
       <MainStack.Screen name="Notifications" component={NotificationScreen} />
-      <MainStack.Screen 
-        name="CreateDiary" 
-        component={CreateDiaryScreen} 
-        options={{ presentation: 'fullScreenModal' }}
-      />
+      <MainStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
+      <MainStack.Screen name="CreateDiary" component={CreateDiaryScreen} options={{ presentation: 'fullScreenModal' }} />
+      <MainStack.Screen name="EditDiary" component={EditDiaryScreen} options={{ presentation: 'fullScreenModal' }} />
       <MainStack.Screen name="Comment" component={CommentScreen} options={{ presentation: 'modal' }} />
+      <MainStack.Screen name="Settings" component={SettingsScreen} />
+      <MainStack.Screen name="Partner" component={PartnerScreen} />
+      <MainStack.Screen name="GroupDetail" component={GroupDetailScreen} />
+      <MainStack.Screen name="DiaryBook" component={DiaryBookScreen} />
       {/* Phase 3 Screens */}
       <MainStack.Screen name="CreateItinerary" component={CreateItineraryScreen} />
       <MainStack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ presentation: 'modal' }} />
