@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
+import { aiService } from '../../api/aiService';
+import { useUsageLimits } from '../../hooks/useUsageLimits';
 
 const { width } = Dimensions.get('window');
 
@@ -42,15 +44,7 @@ const INTERESTS = [
   { label: "Nghỉ dưỡng", icon: "heart" },
 ];
 
-const PHU_QUOC_ITINERARY = {
-  title: "Đến Đảo & Khám Phá Bắc",
-  duration: "5 ngày",
-  days: [
-    { day: 1, title: "Bay đến Phú Quốc, nhận phòng", activities: ["Thăm Làng Chài & khu nuôi cấy ngọc trai", "Chiều: Dinh Cậu – ngắm hoàng hôn", "Tối: Bia hơi tươi & hải sản chợ đêm"], budget: "1.600.000₫" },
-    { day: 2, title: "Tour 3 Đảo & Lặn Biển", activities: ["7h sáng: Xuất phát tour 3 đảo nam", "Lặn ngắm san hô tại Hòn Mây Rút", "Ăn hải sản BBQ ngay trên thuyền"], budget: "1.900.000₫" },
-    { day: 3, title: "VinWonders & Cáp Treo", activities: ["Sáng: Cáp treo Hòn Thơm", "Trưa: Ăn trưa tại Grand World", "Chiều: VinWonders Park"], budget: "2.500.000₫" },
-  ]
-};
+// Removed hardcoded PHU_QUOC_ITINERARY
 
 export function CreateItineraryScreen({ navigation }: any) {
   const [step, setStep] = useState(1);
@@ -61,15 +55,38 @@ export function CreateItineraryScreen({ navigation }: any) {
   const [interests, setInterests] = useState<string[]>(["Biển & Bơi lội", "Ẩm thực"]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [itineraryResult, setItineraryResult] = useState<any>(null);
+  const { checkLimit, incrementUsage } = useUsageLimits();
+
+  React.useEffect(() => {
+    checkLimit('create_itinerary', true).then(allowed => {
+      if (!allowed) navigation.goBack();
+    });
+  }, []);
 
   const selectedDest = DESTINATIONS.find((d) => d.id === destination) || DESTINATIONS[0];
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    const aiAllowed = await checkLimit('ai_itinerary', true);
+    if (!aiAllowed) return;
+
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    try {
+      const result = await aiService.generateItinerary({
+        destination: selectedDest.name,
+        duration,
+        groupSize,
+        budget,
+        interests
+      }, "vi");
+      await incrementUsage('ai_itinerary');
+      setItineraryResult(result);
       setStep(4);
-    }, 2000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const toggleInterest = (label: string) => {
@@ -223,22 +240,22 @@ export function CreateItineraryScreen({ navigation }: any) {
           </View>
         )}
 
-        {step === 4 && (
+        {step === 4 && itineraryResult && (
           <View style={styles.resultContainer}>
             <LinearGradient colors={gradients.primary} style={styles.resultHeader}>
-              <Text style={styles.resultDest}>{selectedDest.name} · {duration}</Text>
+              <Text style={styles.resultDest}>{itineraryResult.title || `${selectedDest.name} · ${duration}`}</Text>
               <Text style={styles.resultMeta}>👥 {groupSize}   💰 {budget}</Text>
             </LinearGradient>
 
             <Text style={styles.resultSubtitle}>Lịch trình chi tiết</Text>
-            {PHU_QUOC_ITINERARY.days.map(day => (
+            {itineraryResult.days.map((day: any) => (
               <View key={day.day} style={styles.dayCard}>
                 <View style={styles.dayHeader}>
                   <Text style={styles.dayNumber}>NGÀY {day.day}</Text>
                   <Text style={styles.dayBudget}>~{day.budget}</Text>
                 </View>
                 <Text style={styles.dayTitle}>{day.title}</Text>
-                {day.activities.map((act, idx) => (
+                {day.activities.map((act: string, idx: number) => (
                   <View key={idx} style={styles.actRow}>
                     <View style={styles.actDot} />
                     <Text style={styles.actText}>{act}</Text>
@@ -249,13 +266,15 @@ export function CreateItineraryScreen({ navigation }: any) {
 
             <View style={styles.dayCard}>
               <Text style={[styles.dayTitle, { marginBottom: spacing.sm }]}>Ước tính chi phí</Text>
-              <View style={styles.costRow}><Text style={styles.costLabel}>Vé máy bay</Text><Text style={styles.costVal}>2.400.000₫</Text></View>
-              <View style={styles.costRow}><Text style={styles.costLabel}>Khách sạn</Text><Text style={styles.costVal}>4.500.000₫</Text></View>
-              <View style={styles.costRow}><Text style={styles.costLabel}>Ăn uống</Text><Text style={styles.costVal}>1.800.000₫</Text></View>
-              <View style={styles.costRow}><Text style={styles.costLabel}>Vui chơi</Text><Text style={styles.costVal}>2.200.000₫</Text></View>
+              {itineraryResult.budgetBreakdown?.map((cost: any, idx: number) => (
+                <View key={idx} style={styles.costRow}>
+                  <Text style={styles.costLabel}>{cost.label}</Text>
+                  <Text style={styles.costVal}>{cost.amount}</Text>
+                </View>
+              ))}
               <View style={[styles.costRow, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.sm }]}>
                 <Text style={[styles.costLabel, { fontWeight: 'bold' }]}>Tổng cộng</Text>
-                <Text style={[styles.costVal, { color: colors.primary, fontSize: 16 }]}>10.900.000₫</Text>
+                <Text style={[styles.costVal, { color: colors.primary, fontSize: 16 }]}>{itineraryResult.totalBudget}</Text>
               </View>
             </View>
 

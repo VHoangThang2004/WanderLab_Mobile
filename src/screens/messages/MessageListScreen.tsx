@@ -4,9 +4,9 @@ import {
   TextInput, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/authStore';
+import { UserAvatar } from '../../components/UserAvatar';
 import { messageService, ChatContact } from '../../api/messageService';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { EmptyState } from '../../components/EmptyState';
@@ -48,7 +48,7 @@ export function MessageListScreen({ navigation }: MessageListScreenProps) {
       onPress={() => navigation.navigate('Chat', { contactId: item.id, contactName: item.name, contactAvatar: item.avatar })}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} contentFit="cover" />
+        <UserAvatar src={item.avatar} name={item.name} style={styles.avatar} />
         {item.isOnline && <View style={styles.onlineBadge} />}
       </View>
       <View style={styles.contactInfo}>

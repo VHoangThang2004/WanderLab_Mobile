@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
+import { aiService } from '../../api/aiService';
+import { useUsageLimits } from '../../hooks/useUsageLimits';
 
 interface Message {
   id: string;
@@ -28,25 +30,37 @@ export function AIAssistantScreen({ navigation }: any) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { checkLimit, incrementUsage } = useUsageLimits();
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
-    const userMsg: Message = { id: Date.now().toString(), text: input.trim(), isUser: true };
+    const allowed = await checkLimit('ai_diary', true);
+    if (!allowed) return;
+
+    const userText = input.trim();
+    const userMsg: Message = { id: Date.now().toString(), text: userText, isUser: true };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
-    // Mock AI response
-    setTimeout(() => {
+    try {
+      const history = messages.map(m => m.text);
+      const response = await aiService.chatWithWanderBot(userText, history);
+      
+      await incrementUsage('ai_diary');
+      
       const botMsg: Message = { 
         id: (Date.now() + 1).toString(), 
-        text: 'WanderBot đang tra cứu thông tin... Bạn có thể tham khảo thêm Lịch trình gợi ý nhé!', 
+        text: response, 
         isUser: false 
       };
       setMessages(prev => [...prev, botMsg]);
+    } catch (e) {
+      console.error(e);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const renderMessage = ({ item }: { item: Message }) => (

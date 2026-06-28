@@ -22,7 +22,11 @@ interface AuthState {
     avatar_url?: string | null;
     cover_image_url?: string | null;
   }) => Promise<void>;
+  subscribeToProfileUpdates: () => void;
+  unsubscribeFromProfileUpdates: () => void;
 }
+
+let profileSubscription: any = null;
 
 function buildUser(
   authUser: { id: string; email?: string | null; created_at: string; user_metadata?: Record<string, unknown> },
@@ -169,6 +173,49 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           set({ isLoading: false });
           throw error;
+        }
+      },
+
+      subscribeToProfileUpdates: () => {
+        const { user } = get();
+        if (!user) return;
+
+        if (profileSubscription) {
+          profileSubscription.unsubscribe();
+        }
+
+        profileSubscription = supabase
+          .channel(`public:profiles:${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'profiles',
+              filter: `id=eq.${user.id}`,
+            },
+            (payload) => {
+              const updatedProfile = payload.new;
+              set((state) => {
+                if (state.user && state.user.id === updatedProfile.id) {
+                  return {
+                    user: {
+                      ...state.user,
+                      ...updatedProfile,
+                    },
+                  };
+                }
+                return state;
+              });
+            }
+          )
+          .subscribe();
+      },
+
+      unsubscribeFromProfileUpdates: () => {
+        if (profileSubscription) {
+          profileSubscription.unsubscribe();
+          profileSubscription = null;
         }
       },
     }),

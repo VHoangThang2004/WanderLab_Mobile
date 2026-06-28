@@ -217,15 +217,20 @@ export const friendService = {
       .select('follower_id')
       .eq('following_id', userId);
 
-    const excludedIds = new Set([
+    const excludedIds = Array.from(new Set([
       userId,
       ...(following || []).map(f => f.following_id),
       ...(followers || []).map(f => f.follower_id)
-    ]);
+    ]));
 
     let query = supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, location, diaries_count, followers_count, following_count');
+      .select('id, full_name, avatar_url, location, diaries_count, followers_count, following_count')
+      .neq('role', 'admin'); // Do not show admins in friend suggestions
+
+    if (excludedIds.length > 0) {
+      query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+    }
 
     if (searchQuery.trim()) {
       // Search by name if query is provided
@@ -242,6 +247,6 @@ export const friendService = {
       return [];
     }
 
-    return (profiles || []).filter(p => !excludedIds.has(p.id));
+    return profiles || [];
   }
 };

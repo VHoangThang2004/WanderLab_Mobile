@@ -4,9 +4,9 @@ import {
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/authStore';
+import { UserAvatar } from '../../components/UserAvatar';
 import { messageService, ChatMessage } from '../../api/messageService';
 import { supabase } from '../../lib/supabase';
 import { colors, typography, spacing, borderRadius } from '../../theme';
@@ -112,7 +112,7 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
     return (
       <View style={[styles.messageWrapper, isMe ? styles.messageWrapperMe : styles.messageWrapperOther]}>
         {!isMe && (
-          <Image source={{ uri: contactAvatar }} style={styles.messageAvatar} contentFit="cover" />
+          <UserAvatar src={contactAvatar} name={contactName} style={styles.messageAvatar} />
         )}
         <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
           <Text style={[styles.messageText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
@@ -136,15 +136,29 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Image source={{ uri: contactAvatar }} style={styles.headerAvatar} contentFit="cover" />
+          <UserAvatar src={contactAvatar} name={contactName} style={styles.headerAvatar} />
           <View>
             <Text style={styles.headerName}>{contactName}</Text>
             <Text style={styles.headerStatus}>Đang hoạt động</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="information-circle-outline" size={24} color={colors.text} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Call', { contactId, contactName, contactAvatar, isVideo: false })}
+          >
+            <Ionicons name="call-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Call', { contactId, contactName, contactAvatar, isVideo: true })}
+          >
+            <Ionicons name="videocam-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton}>
+            <Ionicons name="information-circle-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Messages */}

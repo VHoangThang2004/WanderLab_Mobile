@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/authStore';
+import { useLanguageStore } from '../../stores/languageStore';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { GradientButton } from '../../components/GradientButton';
 
@@ -15,6 +16,7 @@ interface SettingsScreenProps {
 
 export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const { user, logout, updateProfile, changePassword } = useAuthStore();
+  const { language, setLanguage } = useLanguageStore();
   const [activeModal, setActiveModal] = useState<'profile' | 'password' | null>(null);
 
   // Profile Form
@@ -119,6 +121,22 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
             title="Đổi mật khẩu"
             subtitle="Bảo mật tài khoản"
             onPress={() => setActiveModal('password')}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tùy chỉnh</Text>
+          <SettingItem
+            icon="language-outline"
+            title="Ngôn ngữ"
+            subtitle={language === 'vi' ? 'Tiếng Việt' : 'English'}
+            onPress={() => {
+              Alert.alert('Chọn ngôn ngữ', '', [
+                { text: 'Tiếng Việt', onPress: () => setLanguage('vi') },
+                { text: 'English', onPress: () => setLanguage('en') },
+                { text: 'Hủy', style: 'cancel' }
+              ]);
+            }}
           />
         </View>
 

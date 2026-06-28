@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
 import { friendService, FriendProfile } from '../api/friendService';
 import { useAuthStore } from '../stores/authStore';
+import { UserAvatar } from './UserAvatar';
 import { colors, typography, spacing, borderRadius } from '../theme';
 
 export function SuggestedUsers() {
@@ -75,10 +75,10 @@ export function SuggestedUsers() {
           const isFollowing = followingIds.has(profile.id);
           return (
             <View key={profile.id} style={styles.card}>
-              <Image 
-                source={{ uri: profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200' }} 
+              <UserAvatar 
+                src={profile.avatar_url} 
+                name={profile.full_name || 'User'}
                 style={styles.avatar} 
-                contentFit="cover"
               />
               <Text style={styles.name} numberOfLines={1}>{profile.full_name}</Text>
               <Text style={styles.followers} numberOfLines={1}>

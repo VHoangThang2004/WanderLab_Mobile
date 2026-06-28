@@ -12,6 +12,7 @@ import { DiaryPostCard } from '../../components/DiaryPostCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { SuggestedUsers } from '../../components/SuggestedUsers';
+import { UserAvatar } from '../../components/UserAvatar';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
@@ -62,7 +63,10 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
         <Image source={{ uri: item.bg }} style={styles.storyBg} contentFit="cover" />
         <LinearGradient colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.6)']} style={StyleSheet.absoluteFill} />
         <View style={styles.storyAvatarContainer}>
-          <Image source={{ uri: item.avatar }} style={styles.storyAvatar} contentFit="cover" />
+          <UserAvatar src={item.avatar} name={item.name} style={styles.storyAvatar} />
+        </View>
+        <View style={styles.reelPlayIcon}>
+          <Ionicons name="play" size={16} color="#fff" />
         </View>
         <Text style={styles.storyName}>{item.name}</Text>
       </View>
@@ -95,10 +99,14 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
         </View>
       </View>
 
-      {/* Stories */}
+      {/* Reels */}
       <View style={styles.storiesContainer}>
+        <View style={styles.reelsHeader}>
+          <Ionicons name="videocam-outline" size={20} color={colors.text} />
+          <Text style={styles.reelsTitle}>Reels</Text>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-          {/* Create Story */}
+          {/* Create Reel */}
           <TouchableOpacity 
             style={styles.storyItem} 
             activeOpacity={0.8}
@@ -236,13 +244,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Stories
+  // Reels
   storiesContainer: {
     backgroundColor: '#fff',
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  reelsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  reelsTitle: {
+    fontSize: typography.base,
+    fontWeight: typography.bold,
+    color: colors.text,
   },
   storiesScroll: {
     paddingHorizontal: spacing.md,
@@ -286,6 +306,13 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowRadius: 4,
     textShadowOffset: { width: 0, height: 1 },
+  },
+  reelPlayIcon: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -8,
+    marginTop: -8,
   },
   createStory: {
     backgroundColor: '#f3f4f6',

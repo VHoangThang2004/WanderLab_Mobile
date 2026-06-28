@@ -1,65 +1,58 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../../stores/authStore';
+import { notificationService, AppNotification } from '../../api/notificationService';
+import { UserAvatar } from '../../components/UserAvatar';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 
-interface NotificationItem {
-  id: string;
-  type: 'like' | 'comment' | 'follow' | 'system';
-  user_name: string;
-  avatar: string;
-  content: string;
-  time: string;
-  is_read: boolean;
-  diary_image?: string;
-}
-
-const mockNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    type: 'like',
-    user_name: 'Nguyễn Văn A',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
-    content: 'đã thích bài viết của bạn.',
-    time: '5 phút trước',
-    is_read: false,
-    diary_image: 'https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=200',
-  },
-  {
-    id: '2',
-    type: 'comment',
-    user_name: 'Trần Thị B',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-    content: 'đã bình luận: "Cảnh đẹp quá bạn ơi!"',
-    time: '1 giờ trước',
-    is_read: false,
-    diary_image: 'https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=200',
-  },
-  {
-    id: '3',
-    type: 'follow',
-    user_name: 'Lê Hoàng C',
-    avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200',
-    content: 'đã bắt đầu theo dõi bạn.',
-    time: '2 ngày trước',
-    is_read: true,
-  },
-  {
-    id: '4',
-    type: 'system',
-    user_name: 'Hệ thống',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-    content: 'Chào mừng bạn đến với WanderLab! Bắt đầu chia sẻ hành trình của bạn ngay.',
-    time: '1 tuần trước',
-    is_read: true,
-  }
-];
-
 export function NotificationScreen({ navigation }: any) {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(mockNotifications);
+  const { user } = useAuthStore();
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+      
+      const sub = notificationService.subscribeToNotifications(user.id, () => {
+        loadNotifications();
+      });
+      
+      return () => {
+        if (sub) sub.unsubscribe();
+      };
+    }
+  }, [user]);
+
+  const loadNotifications = async () => {
+    if (!user) return;
+    try {
+      const data = await notificationService.fetchNotifications(user.id);
+      setNotifications(data);
+    } catch (error) {
+      console.warn("Failed to load notifications", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePress = async (item: AppNotification) => {
+    if (!item.is_read) {
+      await notificationService.markAsRead(item.id);
+      setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, is_read: true } : n));
+    }
+    
+    // Navigate based on type
+    if (item.type === 'like' || item.type === 'comment') {
+      navigation.navigate('DiaryDetail', { id: item.reference_id });
+    } else if (item.type === 'friend_request' || item.type === 'friend_accept') {
+      navigation.navigate('Follows', { initialTab: 'friends' });
+    }
+  };
 
   const filteredData = filter === 'all' ? notifications : notifications.filter(n => !n.is_read);
 
@@ -67,38 +60,53 @@ export function NotificationScreen({ navigation }: any) {
     switch(type) {
       case 'like': return <Ionicons name="heart" size={16} color="#ef4444" />;
       case 'comment': return <Ionicons name="chatbubble" size={16} color={colors.primary} />;
+      case 'friend_request':
+      case 'friend_accept':
       case 'follow': return <Ionicons name="person-add" size={16} color="#3b82f6" />;
       default: return <Ionicons name="information-circle" size={16} color="#f59e0b" />;
     }
   };
 
-  const renderItem = ({ item }: { item: NotificationItem }) => (
-    <TouchableOpacity style={[styles.notificationRow, !item.is_read && styles.unreadRow]}>
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        <View style={styles.iconBadge}>
-          {getIconForType(item.type)}
-        </View>
-      </View>
-      
-      <View style={styles.contentContainer}>
-        <Text style={styles.contentText}>
-          <Text style={styles.userName}>{item.user_name} </Text>
-          {item.content}
-        </Text>
-        <Text style={styles.timeText}>{item.time}</Text>
-      </View>
+  const formatTime = (isoString: string) => {
+    const d = new Date(isoString);
+    const diff = Math.floor((Date.now() - d.getTime()) / 60000); // minutes
+    if (diff < 60) return `${diff} phút trước`;
+    if (diff < 1440) return `${Math.floor(diff / 60)} giờ trước`;
+    return `${Math.floor(diff / 1440)} ngày trước`;
+  };
 
-      {item.diary_image && (
-        <Image source={{ uri: item.diary_image }} style={styles.diaryImage} />
-      )}
-      {item.type === 'follow' && (
-        <TouchableOpacity style={styles.followBtn}>
-          <Text style={styles.followBtnText}>Theo dõi lại</Text>
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  );
+  const renderItem = ({ item }: { item: AppNotification }) => {
+    const actorAvatar = item.actor?.avatar_url;
+    const actorName = item.actor?.full_name || 'Hệ thống';
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.notificationRow, !item.is_read && styles.unreadRow]}
+        onPress={() => handlePress(item)}
+      >
+        <View style={styles.avatarContainer}>
+          <UserAvatar src={actorAvatar} name={actorName} style={styles.avatar} />
+          <View style={styles.iconBadge}>
+            {getIconForType(item.type)}
+          </View>
+        </View>
+        
+        <View style={styles.contentContainer}>
+          <Text style={styles.contentText}>
+            <Text style={styles.userName}>{actorName} </Text>
+            {item.content}
+          </Text>
+          <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+        </View>
+
+        {item.type === 'friend_request' && (
+          <TouchableOpacity style={styles.followBtn} onPress={() => navigation.navigate('Follows', { initialTab: 'requests' })}>
+            <Text style={styles.followBtnText}>Xem</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -130,18 +138,24 @@ export function NotificationScreen({ navigation }: any) {
       </View>
 
       {/* List */}
-      <FlatList
-        data={filteredData}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={48} color={colors.textTertiary} />
-            <Text style={styles.emptyText}>Chưa có thông báo nào.</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredData}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-off-outline" size={48} color={colors.textTertiary} />
+              <Text style={styles.emptyText}>Chưa có thông báo nào.</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -244,12 +258,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  diaryImage: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.sm,
-    marginLeft: spacing.sm,
-  },
   followBtn: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
@@ -271,5 +279,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontSize: typography.base,
     color: colors.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

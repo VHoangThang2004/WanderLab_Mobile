@@ -13,6 +13,7 @@ import { CreateDiaryPayload } from '../../types/diary';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useUsageLimits } from '../../hooks/useUsageLimits';
 
 const PROVINCES = [
   "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
@@ -28,6 +29,15 @@ export function CreateDiaryScreen() {
   const navigation = useNavigation<any>();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const { checkLimit, incrementUsage, checkMediaLimits } = useUsageLimits();
+
+  React.useEffect(() => {
+    checkLimit('create_diary', true).then(allowed => {
+      if (!allowed) {
+        navigation.goBack();
+      }
+    });
+  }, []);
 
   // Step 1: Basic Info
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -142,6 +152,11 @@ export function CreateDiaryScreen() {
   const handleCreate = async () => {
     if (!validateStep4()) return;
     
+    const allowed = await checkLimit('create_diary', true);
+    if (!allowed) return;
+
+    if (!checkMediaLimits(0, 1, 0, 0)) return; // 1 image (cover)
+
     setLoading(true);
     try {
       const coverUrl = await diaryService.uploadDiaryImage(imageUri!);
@@ -175,6 +190,7 @@ export function CreateDiaryScreen() {
       };
 
       await diaryService.createDiary(payload, coverUrl);
+      await incrementUsage('create_diary');
       
       Alert.alert('Thành công', 'Bài viết đã được tạo thành công!', [
         { text: 'OK', onPress: () => navigation.goBack() }

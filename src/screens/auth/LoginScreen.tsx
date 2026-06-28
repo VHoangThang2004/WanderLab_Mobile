@@ -92,6 +92,14 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
               </TouchableOpacity>
             </View>
 
+            {/* Forgot Password Link */}
+            <TouchableOpacity 
+              style={{ alignSelf: 'flex-end', marginBottom: spacing.md }}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
+              <Text style={{ color: colors.primary, fontSize: typography.sm }}>Quên mật khẩu?</Text>
+            </TouchableOpacity>
+
             <GradientButton
               title="Đăng Nhập"
               onPress={handleLogin}

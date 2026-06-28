@@ -7,13 +7,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useQuery } from '@tanstack/react-query';
 import { DiaryPostCard } from '../../components/DiaryPostCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
+import { UserAvatar } from '../../components/UserAvatar';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
+import { supabase } from '../../lib/supabase';
 import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
 
 const { width } = Dimensions.get('window');
@@ -23,8 +26,9 @@ interface ProfileScreenProps {
 }
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = React.useState<'diaries' | 'itineraries' | 'stats'>('diaries');
+  const [isUploading, setIsUploading] = React.useState(false);
 
   const { data: myDiaries, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['myDiaries'],
@@ -43,6 +47,49 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     );
   };
 
+  const pickAndUploadImage = async (bucket: 'avatars' | 'covers', field: 'avatar_url' | 'cover_image_url') => {
+    if (!user) return;
+    
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: bucket === 'avatars' ? [1, 1] : [16, 9],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      setIsUploading(true);
+      const uri = result.assets[0].uri;
+      
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const fileExt = uri.split('.').pop() || 'jpg';
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, blob, {
+          contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      
+      await updateProfile({ [field]: publicUrlData.publicUrl });
+      
+    } catch (e: any) {
+      console.warn('Upload error:', e);
+      Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   if (!user) {
     return <LoadingSpinner />;
   }
@@ -56,7 +103,11 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         }
       >
       {/* Cover Image */}
-      <View style={styles.coverContainer}>
+      <TouchableOpacity 
+        style={styles.coverContainer}
+        onPress={() => pickAndUploadImage('covers', 'cover_image_url')}
+        disabled={isUploading}
+      >
         {user.cover_image_url ? (
           <Image source={{ uri: user.cover_image_url }} style={styles.coverImage} contentFit="cover" />
         ) : (
@@ -64,22 +115,32 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         )}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.4)']} style={StyleSheet.absoluteFill} />
 
+        <View style={styles.editCoverIndicator}>
+          <Ionicons name="camera" size={20} color="#fff" />
+        </View>
+
         {/* Settings Button */}
         <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')}>
           <Ionicons name="settings-outline" size={22} color="#fff" />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
 
       {/* Avatar + Name */}
       <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-          <Image
-            source={{ uri: user.avatar_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200' }}
+        <TouchableOpacity 
+          style={styles.avatarContainer}
+          onPress={() => pickAndUploadImage('avatars', 'avatar_url')}
+          disabled={isUploading}
+        >
+          <UserAvatar
+            src={user.avatar_url}
+            name={user.full_name || 'User'}
             style={styles.avatar}
-            contentFit="cover"
           />
-          <View style={styles.avatarBorder} />
-        </View>
+          <View style={styles.editAvatarBtn}>
+            <Ionicons name="camera" size={16} color="#fff" />
+          </View>
+        </TouchableOpacity>
         <Text style={styles.userName}>{user.full_name || 'Người dùng'}</Text>
         <Text style={styles.userEmail}>{user.email}</Text>
         {user.bio && <Text style={styles.userBio}>{user.bio}</Text>}
@@ -270,6 +331,11 @@ const styles = StyleSheet.create({
   // Cover
   coverContainer: { width, height: 180, position: 'relative' },
   coverImage: { width: '100%', height: '100%' },
+  editCoverIndicator: {
+    position: 'absolute', bottom: spacing.md, right: spacing.md,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
+  },
   settingsBtn: {
     position: 'absolute', top: 50, right: spacing.base,
     width: 40, height: 40, borderRadius: 20,
@@ -278,11 +344,12 @@ const styles = StyleSheet.create({
   // Profile
   profileHeader: { alignItems: 'center', marginTop: -44, paddingHorizontal: spacing.base },
   avatarContainer: { position: 'relative' },
-  avatar: { width: 88, height: 88, borderRadius: 44 },
-  avatarBorder: {
-    position: 'absolute', inset: -3,
-    width: 94, height: 94, borderRadius: 47,
-    borderWidth: 3, borderColor: '#fff',
+  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#fff' },
+  editAvatarBtn: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#fff'
   },
   userName: { fontSize: typography.xl, fontWeight: typography.bold, color: colors.text, marginTop: spacing.sm },
   userEmail: { fontSize: typography.sm, color: colors.textSecondary, marginTop: 2 },

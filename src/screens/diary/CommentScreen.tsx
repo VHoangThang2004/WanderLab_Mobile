@@ -7,8 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { interactionService } from '../../api/interactionService';
+import { interactionService, Comment } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
+import { UserAvatar } from '../../components/UserAvatar';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { formatDistanceToNow } from '../../lib/utils'; // if exists, or I will write a small local helper
 
@@ -51,10 +52,10 @@ export function CommentScreen({ route, navigation }: any) {
 
   const renderComment = ({ item }: { item: any }) => (
     <View style={styles.commentRow}>
-      <Image 
-        source={{ uri: item.author.avatar_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04' }} 
+      <UserAvatar 
+        src={item.author.avatar_url} 
+        name={item.author.full_name || 'User'}
         style={styles.avatar} 
-        contentFit="cover" 
       />
       <View style={styles.commentContent}>
         <View style={styles.commentHeader}>
@@ -78,8 +79,8 @@ export function CommentScreen({ route, navigation }: any) {
 
       <KeyboardAvoidingView 
         style={styles.flex1} 
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 24}
       >
         {isLoading ? (
           <View style={styles.center}>
@@ -98,8 +99,9 @@ export function CommentScreen({ route, navigation }: any) {
         )}
 
         <View style={styles.inputContainer}>
-          <Image 
-            source={{ uri: user?.avatar_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04' }} 
+          <UserAvatar 
+            src={user?.avatar_url} 
+            name={user?.full_name || 'User'}
             style={styles.myAvatar} 
           />
           <TextInput
