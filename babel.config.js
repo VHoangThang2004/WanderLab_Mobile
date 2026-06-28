@@ -3,7 +3,15 @@ module.exports = function(api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      ['babel-plugin-transform-import-meta', { module: 'ES6' }]
-    ]
+      function () {
+        return {
+          visitor: {
+            MetaProperty(path) {
+              path.replaceWithSourceString('process');
+            },
+          },
+        };
+      },
+    ],
   };
 };
