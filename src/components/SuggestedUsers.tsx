@@ -3,10 +3,16 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { friendService, FriendProfile } from '../api/friendService';
 import { useAuthStore } from '../stores/authStore';
 import { UserAvatar } from './UserAvatar';
-import { colors, typography, spacing, borderRadius } from '../theme';
+import { colors as staticColors, typography, spacing, borderRadius } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { useTranslation } from '../hooks/useTranslation';
 
 export function SuggestedUsers() {
   const { user } = useAuthStore();
+  const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const styles = getStyles(colors, isDarkMode);
+
   const [suggested, setSuggested] = useState<FriendProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
@@ -60,9 +66,9 @@ export function SuggestedUsers() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Gợi ý kết bạn</Text>
+        <Text style={styles.title}>{t('feed.suggestedUsers') || 'Gợi ý kết bạn'}</Text>
         <TouchableOpacity>
-          <Text style={styles.seeAll}>Xem tất cả</Text>
+          <Text style={styles.seeAll}>{t('feed.seeAll') || 'Xem tất cả'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -82,7 +88,7 @@ export function SuggestedUsers() {
               />
               <Text style={styles.name} numberOfLines={1}>{profile.full_name}</Text>
               <Text style={styles.followers} numberOfLines={1}>
-                {profile.followers_count || 0} người theo dõi
+                {profile.followers_count || 0} {t('feed.followers') || 'người theo dõi'}
               </Text>
 
               <TouchableOpacity 
@@ -91,7 +97,7 @@ export function SuggestedUsers() {
                 disabled={isFollowing}
               >
                 <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                  {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
+                  {isFollowing ? (t('feed.following') || 'Đang theo dõi') : (t('feed.follow') || 'Theo dõi')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -102,7 +108,7 @@ export function SuggestedUsers() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   container: {
     marginVertical: spacing.md,
   },
@@ -132,7 +138,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: 140,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.lg,
@@ -168,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   followingBtn: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: isDarkMode ? colors.inputBg : '#f3f4f6',
   },
   followBtnText: {
     color: '#fff',

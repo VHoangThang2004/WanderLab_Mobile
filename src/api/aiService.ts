@@ -130,19 +130,65 @@ Return ONLY a valid JSON object, with no other text, exactly matching this struc
   /**
    * Generates bot response for AIAssistant chat.
    */
-  async chatWithWanderBot(message: string, history: string[]): Promise<string> {
-    const prompt = `Bạn là WanderBot, trợ lý du lịch AI thông minh của WanderLab. 
-Người dùng đang hỏi bạn: "${message}"
+  async chatWithWanderBot(message: string, history: { role: 'user' | 'model', text: string }[]): Promise<string> {
+    if (!GEMINI_API_KEY) {
+      throw new Error("INVALID_KEY: Missing Key");
+    }
 
-Bối cảnh trò chuyện gần đây:
-${history.slice(-3).join("\n")}
+    const SYSTEM_PROMPT = `Bạn là trợ lý du lịch AI của WanderLab — nền tảng du lịch Việt Nam.
 
-Hãy trả lời một cách tự nhiên, thân thiện và ngắn gọn (dưới 4 câu). Cung cấp các gợi ý thực tế về du lịch nếu phù hợp. Không sử dụng markdown phức tạp.`;
-    
+## Phạm vi trả lời (QUAN TRỌNG)
+Bạn CHỈ trả lời các câu hỏi liên quan đến:
+• Du lịch Việt Nam (điểm đến, lịch trình, trải nghiệm)
+• Lập kế hoạch chuyến đi (ngân sách, thời gian, phương tiện)
+• Ẩm thực, văn hóa, lễ hội Việt Nam
+• Gợi ý khách sạn, nhà hàng, hoạt động
+• Mẹo du lịch, an toàn, visa, thời tiết
+• Các tính năng của WanderLab (nhật ký, lộ trình, bạn đồng hành)
+
+Nếu người dùng hỏi ngoài phạm vi (lập trình, toán, y tế, pháp luật, chính trị, tình cảm, v.v.), hãy từ chối lịch sự và gợi ý quay lại chủ đề du lịch. Ví dụ:
+"Mình chuyên về du lịch thôi nè 😊 Bạn có muốn tìm hiểu điểm đến nào ở Việt Nam không?"
+
+## Phong cách trả lời
+• Ngắn gọn, thân thiện, dùng emoji phù hợp
+• Dùng markdown để format (bold, list, heading) cho dễ đọc
+• Dùng tiếng Việt trừ khi người dùng hỏi bằng tiếng Anh
+• Ưu tiên thông tin thực tế, có ích`;
+
     try {
-      return await this.generateContent(prompt);
+      const contents = history.map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.text }]
+      }));
+      contents.push({ role: 'user', parts: [{ text: message }] });
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: SYSTEM_PROMPT }]
+            },
+            contents: contents,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      const candidate = data?.candidates?.[0];
+      const text = candidate?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("Không nhận được kết quả hợp lệ từ Gemini API.");
+      }
+
+      return text.trim();
     } catch (error) {
-      console.warn("Falling back to mock chat due to API error.");
+      console.warn("Falling back to mock chat due to API error.", error);
       await new Promise(resolve => setTimeout(resolve, 800));
       return "WanderBot đang tra cứu thông tin... Bạn có thể tham khảo thêm Lịch trình gợi ý nhé!";
     }

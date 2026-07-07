@@ -7,8 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/authStore';
 import { useLanguageStore } from '../../stores/languageStore';
-import { colors, typography, spacing, borderRadius } from '../../theme';
+import { colors as staticColors, typography, spacing, borderRadius } from '../../theme';
 import { GradientButton } from '../../components/GradientButton';
+import { useTranslation } from '../../hooks/useTranslation';
+import { useTheme } from '../../hooks/useTheme';
+import { useThemeStore } from '../../stores/themeStore';
 
 interface SettingsScreenProps {
   navigation: any;
@@ -17,7 +20,13 @@ interface SettingsScreenProps {
 export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const { user, logout, updateProfile, changePassword } = useAuthStore();
   const { language, setLanguage } = useLanguageStore();
-  const [activeModal, setActiveModal] = useState<'profile' | 'password' | null>(null);
+  const { mode, setMode } = useThemeStore();
+  const { t } = useTranslation();
+  const { colors, isDarkMode } = useTheme();
+  
+  const [activeModal, setActiveModal] = useState<'profile' | 'password' | 'language' | 'theme' | null>(null);
+
+  const styles = getStyles(colors, isDarkMode);
 
   // Profile Form
   const [fullName, setFullName] = useState(user?.full_name || '');
@@ -31,11 +40,9 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [showPwd, setShowPwd] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Đăng xuất', style: 'destructive', onPress: () => {
-          logout();
-      } },
+    Alert.alert(t('settings.logout'), t('settings.logoutConfirm'), [
+      { text: t('settings.cancel'), style: 'cancel' },
+      { text: t('settings.logout'), style: 'destructive', onPress: () => logout() },
     ]);
   };
 
@@ -98,17 +105,17 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cài đặt</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tài khoản</Text>
+          <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
           <SettingItem
             icon="person-outline"
-            title="Cập nhật hồ sơ"
-            subtitle="Tên, tiểu sử, địa điểm"
+            title={t('settings.updateProfile')}
+            subtitle={t('settings.updateProfileSub')}
             onPress={() => {
               setFullName(user?.full_name || '');
               setBio(user?.bio || '');
@@ -118,34 +125,34 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           />
           <SettingItem
             icon="lock-closed-outline"
-            title="Đổi mật khẩu"
-            subtitle="Bảo mật tài khoản"
+            title={t('settings.changePassword')}
+            subtitle={t('settings.changePasswordSub')}
             onPress={() => setActiveModal('password')}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tùy chỉnh</Text>
+          <Text style={styles.sectionTitle}>{t('settings.customization')}</Text>
           <SettingItem
             icon="language-outline"
-            title="Ngôn ngữ"
+            title={t('settings.language')}
             subtitle={language === 'vi' ? 'Tiếng Việt' : 'English'}
-            onPress={() => {
-              Alert.alert('Chọn ngôn ngữ', '', [
-                { text: 'Tiếng Việt', onPress: () => setLanguage('vi') },
-                { text: 'English', onPress: () => setLanguage('en') },
-                { text: 'Hủy', style: 'cancel' }
-              ]);
-            }}
+            onPress={() => setActiveModal('language')}
+          />
+          <SettingItem
+            icon={isDarkMode ? 'moon-outline' : 'sunny-outline'}
+            title={t('settings.theme')}
+            subtitle={mode === 'system' ? t('settings.themeSystem') : mode === 'dark' ? t('settings.themeDark') : t('settings.themeLight')}
+            onPress={() => setActiveModal('theme')}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Khác</Text>
+          <Text style={styles.sectionTitle}>{t('settings.other')}</Text>
           <SettingItem
             icon="business-outline"
-            title="Trở thành đối tác"
-            subtitle="WanderLab Partner"
+            title={t('settings.partner')}
+            subtitle={t('settings.partnerSub')}
             onPress={() => navigation.navigate('Partner')}
           />
           <SettingItem
@@ -159,7 +166,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
         <View style={[styles.section, { borderBottomWidth: 0 }]}>
           <SettingItem
             icon="log-out-outline"
-            title="Đăng xuất"
+            title={t('settings.logout')}
             isDanger
             onPress={handleLogout}
           />
@@ -220,22 +227,72 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Language Modal */}
+      <Modal visible={activeModal === 'language'} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>{t('settings.language')}</Text>
+            <TouchableOpacity style={styles.dialogOption} onPress={() => { setLanguage('vi'); setActiveModal(null); }}>
+              <Text style={styles.dialogOptionText}>Tiếng Việt</Text>
+              {language === 'vi' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+            <View style={styles.dialogDivider} />
+            <TouchableOpacity style={styles.dialogOption} onPress={() => { setLanguage('en'); setActiveModal(null); }}>
+              <Text style={styles.dialogOptionText}>English</Text>
+              {language === 'en' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+            <View style={styles.dialogDivider} />
+            <TouchableOpacity style={styles.dialogCancel} onPress={() => setActiveModal(null)}>
+              <Text style={styles.cancelText}>{t('settings.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Theme Modal */}
+      <Modal visible={activeModal === 'theme'} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>{t('settings.theme')}</Text>
+            <TouchableOpacity style={styles.dialogOption} onPress={() => { setMode('light'); setActiveModal(null); }}>
+              <Text style={styles.dialogOptionText}>{t('settings.themeLight')}</Text>
+              {mode === 'light' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+            <View style={styles.dialogDivider} />
+            <TouchableOpacity style={styles.dialogOption} onPress={() => { setMode('dark'); setActiveModal(null); }}>
+              <Text style={styles.dialogOptionText}>{t('settings.themeDark')}</Text>
+              {mode === 'dark' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+            <View style={styles.dialogDivider} />
+            <TouchableOpacity style={styles.dialogOption} onPress={() => { setMode('system'); setActiveModal(null); }}>
+              <Text style={styles.dialogOptionText}>{t('settings.themeSystem')}</Text>
+              {mode === 'system' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+            <View style={styles.dialogDivider} />
+            <TouchableOpacity style={styles.dialogCancel} onPress={() => setActiveModal(null)}>
+              <Text style={styles.cancelText}>{t('settings.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.base, paddingVertical: spacing.sm,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: colors.border,
+    backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   backBtn: { padding: spacing.xs },
   headerTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text },
   content: { flex: 1 },
   section: {
-    backgroundColor: '#fff', marginTop: spacing.md,
+    backgroundColor: colors.card, marginTop: spacing.md,
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border,
   },
   sectionTitle: {
@@ -244,11 +301,11 @@ const styles = StyleSheet.create({
   },
   settingItem: {
     flexDirection: 'row', alignItems: 'center', padding: spacing.lg,
-    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   settingIcon: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#fff0eb', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: isDarkMode ? '#2d1b1b' : '#fff0eb', justifyContent: 'center', alignItems: 'center',
     marginRight: spacing.md,
   },
   settingText: { flex: 1 },
@@ -256,23 +313,33 @@ const styles = StyleSheet.create({
   settingSubtitle: { fontSize: typography.sm, color: colors.textSecondary, marginTop: 2 },
   
   // Modal
-  modalContainer: { flex: 1, backgroundColor: '#fff' },
+  modalContainer: { flex: 1, backgroundColor: colors.background },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     padding: spacing.base, borderBottomWidth: 1, borderBottomColor: colors.border,
+    backgroundColor: colors.card,
   },
   cancelText: { fontSize: typography.base, color: colors.textSecondary },
-  modalTitle: { fontSize: typography.lg, fontWeight: typography.bold },
-  modalContent: { padding: spacing.lg },
+  modalTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text },
+  modalContent: { padding: spacing.lg, backgroundColor: colors.background },
   inputGroup: { marginBottom: spacing.lg },
   label: { fontSize: typography.sm, fontWeight: typography.medium, color: colors.text, marginBottom: spacing.xs },
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md, paddingVertical: 12,
-    fontSize: typography.base, color: colors.text, backgroundColor: '#f9fafb',
+    fontSize: typography.base, color: colors.text, backgroundColor: colors.inputBg,
   },
   textArea: { height: 100, textAlignVertical: 'top' },
   saveBtn: { marginTop: spacing.lg },
   showPwdBtn: { alignSelf: 'flex-end', marginBottom: spacing.lg },
   showPwdText: { color: colors.primary, fontWeight: typography.medium },
+  
+  // Dialog (Language, Theme)
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  dialog: { width: '80%', backgroundColor: colors.card, borderRadius: borderRadius.xl, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border },
+  dialogTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text, textAlign: 'center', marginBottom: spacing.sm },
+  dialogOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, paddingHorizontal: spacing.xl },
+  dialogOptionText: { fontSize: typography.base, color: colors.text },
+  dialogDivider: { height: 1, backgroundColor: colors.border },
+  dialogCancel: { padding: spacing.md, alignItems: 'center', marginTop: spacing.xs },
 });

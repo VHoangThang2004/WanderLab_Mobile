@@ -17,7 +17,10 @@ import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
-import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
+import { useThemeStore } from '../../stores/themeStore';
+import { useTheme } from '../../hooks/useTheme';
+import { useTranslation } from '../../hooks/useTranslation';
+import { colors as staticColors, gradients, typography, spacing, borderRadius } from '../../theme';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +32,10 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { user, logout, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = React.useState<'diaries' | 'itineraries' | 'stats'>('diaries');
   const [isUploading, setIsUploading] = React.useState(false);
+  const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  
+  const styles = getStyles(colors, isDarkMode);
 
   const { data: myDiaries, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['myDiaries'],
@@ -38,11 +45,11 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   const handleLogout = () => {
     Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc muốn đăng xuất?',
+      t('settings.logout'),
+      t('settings.logoutConfirm'),
       [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Đăng xuất', style: 'destructive', onPress: () => logout() },
+        { text: t('settings.cancel'), style: 'cancel' },
+        { text: t('settings.logout'), style: 'destructive', onPress: () => logout() },
       ]
     );
   };
@@ -156,7 +163,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{user.diaries_count}</Text>
-          <Text style={styles.statLabel}>Nhật ký</Text>
+          <Text style={styles.statLabel}>{t('profile.diaries')}</Text>
         </View>
         <View style={styles.statDivider} />
         <TouchableOpacity 
@@ -164,7 +171,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           onPress={() => navigation.navigate('Follows', { initialTab: 'followers' })}
         >
           <Text style={styles.statValue}>{user.followers_count}</Text>
-          <Text style={styles.statLabel}>Người theo dõi</Text>
+          <Text style={styles.statLabel}>{t('profile.followers')}</Text>
         </TouchableOpacity>
         <View style={styles.statDivider} />
         <TouchableOpacity 
@@ -172,7 +179,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           onPress={() => navigation.navigate('Follows', { initialTab: 'following' })}
         >
           <Text style={styles.statValue}>{user.following_count}</Text>
-          <Text style={styles.statLabel}>Đang theo dõi</Text>
+          <Text style={styles.statLabel}>{t('profile.following')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -194,13 +201,13 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity onPress={() => setActiveTab('diaries')} style={[styles.tabBtn, activeTab === 'diaries' && styles.activeTabBtn]}>
-          <Text style={[styles.tabText, activeTab === 'diaries' && styles.activeTabText]}>Nhật Ký</Text>
+          <Text style={[styles.tabText, activeTab === 'diaries' && styles.activeTabText]}>{t('profile.diaries')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('itineraries')} style={[styles.tabBtn, activeTab === 'itineraries' && styles.activeTabBtn]}>
-          <Text style={[styles.tabText, activeTab === 'itineraries' && styles.activeTabText]}>Lịch Trình</Text>
+          <Text style={[styles.tabText, activeTab === 'itineraries' && styles.activeTabText]}>{t('profile.itineraries')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('stats')} style={[styles.tabBtn, activeTab === 'stats' && styles.activeTabBtn]}>
-          <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>Thống Kê</Text>
+          <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>{t('profile.stats')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -209,17 +216,17 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           <>
             {/* Quick Actions (Horizontal) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
-              <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#ffe4e6' }]} onPress={() => navigation.navigate('CreateDiary')}>
+              <TouchableOpacity style={[styles.actionCard, { backgroundColor: isDarkMode ? '#4a1118' : '#ffe4e6' }]} onPress={() => navigation.navigate('CreateDiary')}>
                 <Ionicons name="book" size={20} color="#e11d48" />
-                <Text style={[styles.actionCardText, { color: '#e11d48' }]}>Tạo Nhật Ký</Text>
+                <Text style={[styles.actionCardText, { color: '#e11d48' }]}>{t('profile.createDiary')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#e0e7ff' }]} onPress={() => navigation.navigate('AIAssistant')}>
+              <TouchableOpacity style={[styles.actionCard, { backgroundColor: isDarkMode ? '#1a1d40' : '#e0e7ff' }]} onPress={() => navigation.navigate('AIAssistant')}>
                 <Ionicons name="color-wand" size={20} color="#4f46e5" />
-                <Text style={[styles.actionCardText, { color: '#4f46e5' }]}>Lập Kế Hoạch AI</Text>
+                <Text style={[styles.actionCardText, { color: '#4f46e5' }]}>{t('profile.aiPlanner')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#dcfce7' }]} onPress={() => navigation.navigate('ExploreTab')}>
+              <TouchableOpacity style={[styles.actionCard, { backgroundColor: isDarkMode ? '#11331c' : '#dcfce7' }]} onPress={() => navigation.navigate('ExploreTab')}>
                 <Ionicons name="compass" size={20} color="#16a34a" />
-                <Text style={[styles.actionCardText, { color: '#16a34a' }]}>Khám Phá</Text>
+                <Text style={[styles.actionCardText, { color: '#16a34a' }]}>{t('navigation.explore')}</Text>
               </TouchableOpacity>
             </ScrollView>
 
@@ -326,8 +333,8 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   // Cover
   coverContainer: { width, height: 180, position: 'relative' },
   coverImage: { width: '100%', height: '100%' },
@@ -344,12 +351,12 @@ const styles = StyleSheet.create({
   // Profile
   profileHeader: { alignItems: 'center', marginTop: -44, paddingHorizontal: spacing.base },
   avatarContainer: { position: 'relative' },
-  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#fff' },
+  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: colors.background },
   editAvatarBtn: {
     position: 'absolute', bottom: 0, right: 0,
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#fff'
+    borderWidth: 2, borderColor: colors.background
   },
   userName: { fontSize: typography.xl, fontWeight: typography.bold, color: colors.text, marginTop: spacing.sm },
   userEmail: { fontSize: typography.sm, color: colors.textSecondary, marginTop: 2 },
@@ -361,7 +368,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginTop: spacing.lg, marginHorizontal: spacing.xl,
     paddingVertical: spacing.base,
-    backgroundColor: '#f9fafb', borderRadius: borderRadius.xl,
+    backgroundColor: colors.card, borderRadius: borderRadius.xl,
+    borderWidth: 1, borderColor: colors.border
   },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { fontSize: typography.xl, fontWeight: typography.bold, color: colors.text },
@@ -403,7 +411,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.bold,
   },
   tabContentContainer: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.background,
     flex: 1,
     minHeight: 400,
   },
@@ -418,22 +426,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: spacing.md, paddingVertical: 12,
     borderRadius: borderRadius.lg,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   actionCardText: { fontSize: typography.sm, fontWeight: typography.bold },
   // Quick Share
   quickShareContainer: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     marginHorizontal: spacing.base,
     marginTop: spacing.md,
     padding: spacing.sm,
     borderRadius: borderRadius.xl,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    borderWidth: 1, borderColor: colors.border
   },
   quickShareInput: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.inputBg,
     paddingHorizontal: spacing.md, paddingVertical: 10,
     borderRadius: borderRadius.lg,
   },
@@ -458,7 +465,7 @@ const styles = StyleSheet.create({
   bookBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing.sm, paddingVertical: 4,
-    backgroundColor: colors.primary + '15',
+    backgroundColor: isDarkMode ? colors.primary + '30' : colors.primary + '15',
     borderRadius: borderRadius.md,
   },
   bookBtnText: {
@@ -466,11 +473,11 @@ const styles = StyleSheet.create({
   },
   // Stats Card
   statsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     margin: spacing.base,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    borderWidth: 1, borderColor: colors.border
   },
   statsCardTitle: { fontSize: typography.base, fontWeight: typography.bold, color: colors.text, marginBottom: spacing.lg },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },

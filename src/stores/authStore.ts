@@ -15,6 +15,7 @@ interface AuthState {
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  changePassword: (currentPwd: string, newPwd: string) => Promise<void>;
   updateProfile: (updates: {
     full_name?: string;
     bio?: string | null;
@@ -156,7 +157,8 @@ export const useAuthStore = create<AuthState>()(
 
       updateProfile: async (updates) => {
         const { user } = get();
-        if (!user) throw new Error('User not authenticated');
+        if (!user) throw new Error('Not authenticated');
+
         set({ isLoading: true });
         try {
           const { error } = await supabase
@@ -165,14 +167,21 @@ export const useAuthStore = create<AuthState>()(
             .eq('id', user.id);
 
           if (error) throw error;
-
           set({
-            user: { ...user, ...updates } as User,
-            isLoading: false,
+            user: { ...user, ...updates },
           });
-        } catch (error) {
+        } finally {
           set({ isLoading: false });
-          throw error;
+        }
+      },
+
+      changePassword: async (currentPwd: string, newPwd: string) => {
+        set({ isLoading: true });
+        try {
+          const { error } = await supabase.auth.updateUser({ password: newPwd });
+          if (error) throw error;
+        } finally {
+          set({ isLoading: false });
         }
       },
 

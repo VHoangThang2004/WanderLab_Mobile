@@ -14,18 +14,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
+import Markdown from 'react-native-markdown-display';
 import { aiService } from '../../api/aiService';
 import { useUsageLimits } from '../../hooks/useUsageLimits';
 
 interface Message {
   id: string;
   text: string;
-  isUser: boolean;
+  role: 'user' | 'model';
 }
 
 export function AIAssistantScreen({ navigation }: any) {
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', text: 'Chào bạn! Mình là WanderBot, trợ lý du lịch AI của bạn. Mình có thể giúp gì cho chuyến đi sắp tới của bạn?', isUser: false }
+    { id: '1', text: 'Chào bạn! Mình là WanderBot, trợ lý du lịch AI của bạn. Mình có thể giúp gì cho chuyến đi sắp tới của bạn?', role: 'model' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -39,13 +40,13 @@ export function AIAssistantScreen({ navigation }: any) {
     if (!allowed) return;
 
     const userText = input.trim();
-    const userMsg: Message = { id: Date.now().toString(), text: userText, isUser: true };
+    const userMsg: Message = { id: Date.now().toString(), text: userText, role: 'user' };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
     try {
-      const history = messages.map(m => m.text);
+      const history = messages.map(m => ({ role: m.role, text: m.text }));
       const response = await aiService.chatWithWanderBot(userText, history);
       
       await incrementUsage('ai_diary');
@@ -53,7 +54,7 @@ export function AIAssistantScreen({ navigation }: any) {
       const botMsg: Message = { 
         id: (Date.now() + 1).toString(), 
         text: response, 
-        isUser: false 
+        role: 'model' 
       };
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
@@ -63,20 +64,27 @@ export function AIAssistantScreen({ navigation }: any) {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.messageRow, item.isUser ? styles.messageRowUser : styles.messageRowBot]}>
-      {!item.isUser && (
-        <LinearGradient colors={gradients.primary} style={styles.botAvatar}>
-          <Ionicons name="sparkles" size={14} color="#fff" />
-        </LinearGradient>
-      )}
-      <View style={[styles.messageBubble, item.isUser ? styles.messageBubbleUser : styles.messageBubbleBot]}>
-        <Text style={[styles.messageText, item.isUser ? styles.messageTextUser : styles.messageTextBot]}>
-          {item.text}
-        </Text>
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isUser = item.role === 'user';
+    return (
+      <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowBot]}>
+        {!isUser && (
+          <LinearGradient colors={gradients.primary} style={styles.botAvatar}>
+            <Ionicons name="sparkles" size={14} color="#fff" />
+          </LinearGradient>
+        )}
+        <View style={[styles.messageBubble, isUser ? styles.messageBubbleUser : styles.messageBubbleBot]}>
+          {isUser ? (
+            <Text style={styles.messageTextUser}>{item.text}</Text>
+          ) : (
+            <Markdown style={markdownStyles}>
+              {item.text}
+            </Markdown>
+          )}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -130,6 +138,37 @@ export function AIAssistantScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+const markdownStyles = {
+  body: {
+    color: colors.text,
+    fontSize: typography.base,
+    lineHeight: typography.base * 1.5,
+  },
+  heading1: {
+    fontSize: typography.xl,
+    fontWeight: 'bold' as const,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  heading2: {
+    fontSize: typography.lg,
+    fontWeight: 'bold' as const,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  strong: {
+    fontWeight: 'bold' as const,
+  },
+  paragraph: {
+    marginTop: 0,
+    marginBottom: spacing.sm,
+  },
+  list_item: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  }
+};
 
 const styles = StyleSheet.create({
   container: {

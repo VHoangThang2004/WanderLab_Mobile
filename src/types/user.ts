@@ -16,6 +16,9 @@ export interface User {
   diaries_count: number;
   followers_count: number;
   following_count: number;
+  likes_received?: number;
+  comments_received?: number;
+  saves_received?: number;
   created_at: string;
   updated_at: string;
 }

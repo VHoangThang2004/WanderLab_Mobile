@@ -4,7 +4,7 @@ export const interactionService = {
   async getUserReaction(diaryId: string, userId: string): Promise<string | null> {
     const { data, error } = await supabase
       .from('diary_likes')
-      .select('reaction_type')
+      .select('diary_id')
       .eq('diary_id', diaryId)
       .eq('user_id', userId)
       .single();
@@ -13,7 +13,7 @@ export const interactionService = {
       console.warn('Check reaction error:', error);
       return null;
     }
-    return data ? data.reaction_type : null;
+    return data ? 'like' : null;
   },
 
   async toggleLikeDiary(diaryId: string, userId: string): Promise<{ isLiked: boolean }> {
@@ -151,8 +151,8 @@ export const interactionService = {
         .eq('follower_id', followerId)
         .eq('following_id', followingId);
         
-      await supabase.rpc('decrement_follower', { target_user_id: followingId }).catch(()=>null);
-      await supabase.rpc('decrement_following', { target_user_id: followerId }).catch(()=>null);
+      try { await supabase.rpc('decrement_follower', { target_user_id: followingId }); } catch {}
+      try { await supabase.rpc('decrement_following', { target_user_id: followerId }); } catch {}
 
       return { isFollowing: false };
     } else {
@@ -160,8 +160,8 @@ export const interactionService = {
         .from('follows')
         .insert({ follower_id: followerId, following_id: followingId });
         
-      await supabase.rpc('increment_follower', { target_user_id: followingId }).catch(()=>null);
-      await supabase.rpc('increment_following', { target_user_id: followerId }).catch(()=>null);
+      try { await supabase.rpc('increment_follower', { target_user_id: followingId }); } catch {}
+      try { await supabase.rpc('increment_following', { target_user_id: followerId }); } catch {}
 
       return { isFollowing: true };
     }

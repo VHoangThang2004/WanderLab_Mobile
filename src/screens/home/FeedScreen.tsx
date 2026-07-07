@@ -15,8 +15,10 @@ import { SuggestedUsers } from '../../components/SuggestedUsers';
 import { UserAvatar } from '../../components/UserAvatar';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
+import { useTheme } from '../../hooks/useTheme';
+import { useTranslation } from '../../hooks/useTranslation';
 import { useAuthStore } from '../../stores/authStore';
-import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
+import { colors as staticColors, gradients, typography, spacing, borderRadius } from '../../theme';
 
 const stories = [
   { name: 'Phan Minh', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', bg: 'https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=300' },
@@ -33,6 +35,10 @@ interface FeedScreenProps {
 export function FeedScreen({ navigation }: FeedScreenProps) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  
+  const styles = getStyles(colors, isDarkMode);
 
   const { data: feedDiaries, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['feedDiaries'],
@@ -103,7 +109,7 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
       <View style={styles.storiesContainer}>
         <View style={styles.reelsHeader}>
           <Ionicons name="videocam-outline" size={20} color={colors.text} />
-          <Text style={styles.reelsTitle}>Reels</Text>
+          <Text style={styles.reelsTitle}>{t('feed.reels')}</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
           {/* Create Reel */}
@@ -117,7 +123,7 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
                 <View style={styles.createStoryIcon}>
                   <Ionicons name="add" size={24} color="#fff" />
                 </View>
-                <Text style={styles.createStoryText}>Tạo mới</Text>
+                <Text style={styles.createStoryText}>{t('feed.create')}</Text>
               </LinearGradient>
             </View>
           </TouchableOpacity>
@@ -135,8 +141,8 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
           <Ionicons name="compass" size={18} color={colors.primary} />
         </View>
         <View>
-          <Text style={styles.feedTitle}>Bảng Tin Du Lịch</Text>
-          <Text style={styles.feedSubtitle}>Câu chuyện từ cộng đồng</Text>
+          <Text style={styles.feedTitle}>{t('feed.feedTitle')}</Text>
+          <Text style={styles.feedSubtitle}>{t('feed.feedSubtitle')}</Text>
         </View>
       </View>
     </View>
@@ -153,11 +159,13 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
         keyExtractor={(item) => item.id}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
-          <EmptyState
-            icon="book-outline"
-            title="Chưa có nhật ký nào"
-            message="Hãy tạo nhật ký đầu tiên hoặc theo dõi ai đó!"
-          />
+          feedDiaries && feedDiaries.length === 0 ? (
+            <EmptyState
+              icon="book-outline"
+              title={t('feed.noDiaries')}
+              message={t('feed.noDiariesMsg')}
+            />
+          ) : null
         }
         renderItem={({ item }) => (
           <DiaryPostCard
@@ -184,36 +192,36 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
       <View style={styles.floatingActionContainer}>
         <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateDiary')} activeOpacity={0.8}>
           <Ionicons name="book-outline" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>Tạo Nhật Ký</Text>
+          <Text style={styles.actionBtnText}>{t('feed.createDiary')}</Text>
         </TouchableOpacity>
         
         <View style={styles.actionDivider} />
         
         <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateItinerary')} activeOpacity={0.8}>
           <Ionicons name="map-outline" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>Tạo Lịch Trình</Text>
+          <Text style={styles.actionBtnText}>{t('feed.createItinerary')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.background,
   },
   listContent: {
     paddingBottom: spacing['2xl'],
   },
+  // Header
   appHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.base,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    backgroundColor: '#fff',
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.background,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -221,43 +229,44 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: typography.xl,
-    fontWeight: typography.extrabold,
+    fontWeight: typography.bold,
     color: colors.text,
   },
   headerRight: {
     flexDirection: 'row',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   headerIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  // Reels
+  // Stories (Reels)
   storiesContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   reelsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
     gap: spacing.xs,
+    paddingHorizontal: spacing.base,
+    marginBottom: spacing.sm,
   },
   reelsTitle: {
     fontSize: typography.base,
@@ -265,11 +274,11 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   storiesScroll: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.base,
     gap: spacing.sm,
   },
   storyItem: {
-    marginRight: spacing.sm,
+    alignItems: 'center',
   },
   storyImageContainer: {
     width: 72,
@@ -277,21 +286,22 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     position: 'relative',
-    justifyContent: 'flex-end',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   storyBg: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   storyAvatarContainer: {
     position: 'absolute',
     top: 6,
     left: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: colors.primary,
-    backgroundColor: '#fff',
     overflow: 'hidden',
   },
   storyAvatar: {
@@ -315,7 +325,9 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
   createStory: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.inputBg,
+    borderColor: colors.border,
+    borderWidth: 1,
   },
   createStoryBg: {
     flex: 1,
@@ -348,7 +360,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -356,6 +368,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   feedTitle: {
     fontSize: typography.lg,

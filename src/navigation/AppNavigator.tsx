@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Animated, PanResponder } from 'react-native';
 
 // Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -47,7 +47,9 @@ import { CheckoutScreen } from '../screens/subscription/CheckoutScreen';
 
 // Auth store
 import { useAuthStore } from '../stores/authStore';
-import { colors, gradients } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { useTranslation } from '../hooks/useTranslation';
+import { colors as staticColors, gradients } from '../theme';
 
 const AuthStack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -84,8 +86,28 @@ function ProfileStackNavigator() {
 const DummyComponent = () => null;
 
 function MainTabs({ navigation }: any) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
+  const pan = useRef(new Animated.ValueXY()).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+      },
+      onPanResponderGrant: () => {
+        pan.extractOffset();
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+      },
+    }),
+  ).current;
+
   return (
-    <Tab.Navigator
+    <View style={styles.mainTabsContainer}>
+      <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
@@ -116,7 +138,7 @@ function MainTabs({ navigation }: any) {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: colors.card,
           borderTopColor: colors.border,
           borderTopWidth: 1,
           height: 85,
@@ -130,13 +152,13 @@ function MainTabs({ navigation }: any) {
         },
       })}
     >
-      <Tab.Screen name="HomeTab" component={HomeStackNavigator} options={{ tabBarLabel: 'Trang chủ' }} />
-      <Tab.Screen name="ExploreTab" component={ExploreStackNavigator} options={{ tabBarLabel: 'Khám phá' }} />
-      <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ tabBarLabel: 'Hồ sơ' }} />
+      <Tab.Screen name="HomeTab" component={HomeStackNavigator} options={{ tabBarLabel: t('navigation.home') }} />
+      <Tab.Screen name="ExploreTab" component={ExploreStackNavigator} options={{ tabBarLabel: t('navigation.explore') }} />
+      <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ tabBarLabel: t('navigation.profile') }} />
       <Tab.Screen 
         name="MenuTab" 
         component={DummyComponent}
-        options={{ tabBarLabel: 'Thêm' }}
+        options={{ tabBarLabel: t('navigation.more') }}
         listeners={{
           tabPress: e => {
             e.preventDefault(); // Prevent default action
@@ -144,9 +166,57 @@ function MainTabs({ navigation }: any) {
           },
         }}
       />
-    </Tab.Navigator>
+      </Tab.Navigator>
+
+      <Animated.View
+        style={[
+          styles.floatingBubble,
+          { transform: [{ translateX: pan.x }, { translateY: pan.y }] }
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('AIAssistant')}
+        >
+          <LinearGradient
+            colors={gradients.primary}
+            style={styles.floatingBubbleGradient}
+          >
+            <Ionicons name="sparkles" size={24} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mainTabsContainer: {
+    flex: 1,
+  },
+  floatingBubble: {
+    position: 'absolute',
+    bottom: 105,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    zIndex: 999,
+  },
+  floatingBubbleGradient: {
+    flex: 1,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 function MainNavigator() {
   return (
@@ -194,6 +264,7 @@ function AuthNavigator() {
 
 export function AppNavigator() {
   const { isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates } = useAuthStore();
+  const { isDarkMode, colors } = useTheme();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -206,8 +277,21 @@ export function AppNavigator() {
     };
   }, [isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates]);
 
+  const navigationTheme = isDarkMode ? DarkTheme : DefaultTheme;
+  const customTheme = {
+    ...navigationTheme,
+    colors: {
+      ...navigationTheme.colors,
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.primary,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={customTheme}>
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
