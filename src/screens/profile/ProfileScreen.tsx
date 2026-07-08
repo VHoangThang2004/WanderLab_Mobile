@@ -1,18 +1,20 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Dimensions, Alert, RefreshControl,
+  Dimensions, Alert, RefreshControl, Modal, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { useQuery } from '@tanstack/react-query';
 import { DiaryPostCard } from '../../components/DiaryPostCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { UserAvatar } from '../../components/UserAvatar';
+import { DropdownMenu } from '../../components/DropdownMenu';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
@@ -54,6 +56,35 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     );
   };
 
+  const [viewImage, setViewImage] = React.useState<string | null>(null);
+
+  const handleImagePress = (type: 'avatars' | 'covers', field: 'avatar_url' | 'cover_image_url', url: string | null) => {
+    Alert.alert(
+      type === 'avatars' ? 'Ảnh đại diện' : 'Ảnh bìa',
+      'Bạn muốn làm gì?',
+      [
+        {
+          text: 'Xem ảnh',
+          onPress: () => {
+            if (url) {
+              setViewImage(url);
+            } else {
+              Alert.alert('Thông báo', 'Chưa có ảnh.');
+            }
+          }
+        },
+        {
+          text: 'Đổi ảnh mới',
+          onPress: () => pickAndUploadImage(type, field)
+        },
+        {
+          text: 'Hủy',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
   const pickAndUploadImage = async (bucket: 'avatars' | 'covers', field: 'avatar_url' | 'cover_image_url') => {
     if (!user) return;
     
@@ -63,22 +94,27 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         allowsEditing: true,
         aspect: bucket === 'avatars' ? [1, 1] : [16, 9],
         quality: 0.8,
+        base64: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       setIsUploading(true);
-      const uri = result.assets[0].uri;
+      const asset = result.assets[0];
+      const uri = asset.uri;
+      const base64Str = asset.base64;
       
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      if (!base64Str) {
+        throw new Error('No base64 data returned from image picker');
+      }
+
       const fileExt = uri.split('.').pop() || 'jpg';
       const fileName = `${user.id}_${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
-        .upload(filePath, blob, {
+        .upload(filePath, decode(base64Str), {
           contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
           upsert: true
         });
@@ -102,7 +138,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -112,7 +148,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       {/* Cover Image */}
       <TouchableOpacity 
         style={styles.coverContainer}
-        onPress={() => pickAndUploadImage('covers', 'cover_image_url')}
+        onPress={() => handleImagePress('covers', 'cover_image_url', user?.cover_image_url || null)}
         disabled={isUploading}
       >
         {user.cover_image_url ? (
@@ -125,18 +161,13 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         <View style={styles.editCoverIndicator}>
           <Ionicons name="camera" size={20} color="#fff" />
         </View>
-
-        {/* Settings Button */}
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')}>
-          <Ionicons name="settings-outline" size={22} color="#fff" />
-        </TouchableOpacity>
       </TouchableOpacity>
 
       {/* Avatar + Name */}
       <View style={styles.profileHeader}>
         <TouchableOpacity 
           style={styles.avatarContainer}
-          onPress={() => pickAndUploadImage('avatars', 'avatar_url')}
+          onPress={() => handleImagePress('avatars', 'avatar_url', user?.avatar_url || null)}
           disabled={isUploading}
         >
           <UserAvatar
@@ -224,11 +255,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
                 <Ionicons name="color-wand" size={20} color="#4f46e5" />
                 <Text style={[styles.actionCardText, { color: '#4f46e5' }]}>{t('profile.aiPlanner')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionCard, { backgroundColor: isDarkMode ? '#11331c' : '#dcfce7' }]} onPress={() => navigation.navigate('ExploreTab')}>
-                <Ionicons name="compass" size={20} color="#16a34a" />
-                <Text style={[styles.actionCardText, { color: '#16a34a' }]}>{t('navigation.explore')}</Text>
-              </TouchableOpacity>
-            </ScrollView>
+              </ScrollView>
 
             {/* Quick Share Box */}
             <View style={styles.quickShareContainer}>
@@ -246,13 +273,6 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
             <View style={styles.diariesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Nhật Ký Của Tôi</Text>
-                <TouchableOpacity 
-                  style={styles.bookBtn} 
-                  onPress={() => navigation.navigate('DiaryBook')}
-                >
-                  <Ionicons name="book-outline" size={16} color={colors.primary} />
-                  <Text style={styles.bookBtnText}>Cuốn nhật ký</Text>
-                </TouchableOpacity>
               </View>
               {isLoading ? (
                 <LoadingSpinner size="small" />
@@ -329,6 +349,22 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         )}
       </View>
       </ScrollView>
+
+      {/* Fullscreen Image Viewer */}
+      <Modal visible={!!viewImage} transparent={true} animationType="fade" onRequestClose={() => setViewImage(null)}>
+        <View style={styles.fullscreenImageContainer}>
+          <TouchableOpacity style={styles.closeImageBtn} onPress={() => setViewImage(null)}>
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          {viewImage && (
+            <Image 
+              source={{ uri: viewImage }} 
+              style={styles.fullscreenImage} 
+              contentFit="contain" 
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -343,7 +379,8 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
   },
-  settingsBtn: {
+
+  menuBtn: {
     position: 'absolute', top: 50, right: spacing.base,
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center',
@@ -485,4 +522,21 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   statIconBox: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   statRowLabel: { fontSize: typography.base, color: colors.textSecondary },
   statRowValue: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text },
+  fullscreenImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  closeImageBtn: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
 });

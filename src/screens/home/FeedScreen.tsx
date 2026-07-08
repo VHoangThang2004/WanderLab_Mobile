@@ -20,13 +20,6 @@ import { useTranslation } from '../../hooks/useTranslation';
 import { useAuthStore } from '../../stores/authStore';
 import { colors as staticColors, gradients, typography, spacing, borderRadius } from '../../theme';
 
-const stories = [
-  { name: 'Phan Minh', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', bg: 'https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=300' },
-  { name: 'Hương Trần', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200', bg: 'https://images.unsplash.com/photo-1583417319070-4a69db38a482?w=300' },
-  { name: 'Nam Nguyễn', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200', bg: 'https://images.unsplash.com/photo-1694152362587-99d77d21793b?w=300' },
-  { name: 'Linh Phạm', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', bg: 'https://images.unsplash.com/photo-1643030080539-b411caf44c37?w=300' },
-  { name: 'Tuấn Lê', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', bg: 'https://images.unsplash.com/photo-1528127269322-539801943592?w=300' },
-];
 
 interface FeedScreenProps {
   navigation: any;
@@ -63,75 +56,11 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
     }
   };
 
-  const renderStory = ({ item, index }: { item: typeof stories[0]; index: number }) => (
-    <TouchableOpacity style={styles.storyItem} activeOpacity={0.8}>
-      <View style={styles.storyImageContainer}>
-        <Image source={{ uri: item.bg }} style={styles.storyBg} contentFit="cover" />
-        <LinearGradient colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.6)']} style={StyleSheet.absoluteFill} />
-        <View style={styles.storyAvatarContainer}>
-          <UserAvatar src={item.avatar} name={item.name} style={styles.storyAvatar} />
-        </View>
-        <View style={styles.reelPlayIcon}>
-          <Ionicons name="play" size={16} color="#fff" />
-        </View>
-        <Text style={styles.storyName}>{item.name}</Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   const renderHeader = () => (
     <View>
-      {/* App Header */}
-      <View style={styles.appHeader}>
-        <View style={styles.headerLeft}>
-          <LinearGradient colors={gradients.primary} style={styles.headerLogo}>
-            <Ionicons name="compass" size={20} color="#fff" />
-          </LinearGradient>
-          <Text style={styles.headerTitle}>WanderLab</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.headerIcon}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerIcon}
-            onPress={() => navigation.navigate('MessageList')}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Reels */}
-      <View style={styles.storiesContainer}>
-        <View style={styles.reelsHeader}>
-          <Ionicons name="videocam-outline" size={20} color={colors.text} />
-          <Text style={styles.reelsTitle}>{t('feed.reels')}</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-          {/* Create Reel */}
-          <TouchableOpacity 
-            style={styles.storyItem} 
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('CreateDiary')}
-          >
-            <View style={[styles.storyImageContainer, styles.createStory]}>
-              <LinearGradient colors={['#f3f4f6', '#e5e7eb']} style={styles.createStoryBg}>
-                <View style={styles.createStoryIcon}>
-                  <Ionicons name="add" size={24} color="#fff" />
-                </View>
-                <Text style={styles.createStoryText}>{t('feed.create')}</Text>
-              </LinearGradient>
-            </View>
-          </TouchableOpacity>
-          {stories.map((story, idx) => (
-            <View key={idx}>{renderStory({ item: story, index: idx })}</View>
-          ))}
-        </ScrollView>
-      </View>
+
 
       <SuggestedUsers />
 
@@ -153,7 +82,7 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <FlatList
         data={feedDiaries}
         keyExtractor={(item) => item.id}
@@ -187,21 +116,6 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
       />
-
-      {/* Floating Action Bar */}
-      <View style={styles.floatingActionContainer}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateDiary')} activeOpacity={0.8}>
-          <Ionicons name="book-outline" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>{t('feed.createDiary')}</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.actionDivider} />
-        
-        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CreateItinerary')} activeOpacity={0.8}>
-          <Ionicons name="map-outline" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>{t('feed.createItinerary')}</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -214,47 +128,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   listContent: {
     paddingBottom: spacing['2xl'],
   },
-  // Header
-  appHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.base,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.background,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: typography.xl,
-    fontWeight: typography.bold,
-    color: colors.text,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+
   // Stories (Reels)
   storiesContainer: {
     paddingVertical: spacing.md,
@@ -380,39 +254,4 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     fontSize: typography.xs,
     color: colors.textSecondary,
   },
-  // Floating Action Bar
-  floatingActionContainer: {
-    position: 'absolute',
-    bottom: 24,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    backgroundColor: colors.primary,
-    borderRadius: 30,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    alignItems: 'center',
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  actionBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  actionDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 4,
-  }
 });

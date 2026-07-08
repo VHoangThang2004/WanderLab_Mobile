@@ -100,13 +100,9 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('settings.title')}</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content}>

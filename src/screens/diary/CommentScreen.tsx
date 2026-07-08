@@ -7,11 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { interactionService, Comment } from '../../api/interactionService';
+import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from '../../components/UserAvatar';
 import { colors, typography, spacing, borderRadius } from '../../theme';
-import { formatDistanceToNow } from '../../lib/utils'; // if exists, or I will write a small local helper
 
 // Local helper just in case
 const timeAgo = (dateStr: string) => {

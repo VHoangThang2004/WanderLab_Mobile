@@ -1,5 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { StatusBar } from 'react-native';
+import { StatusBar, LogBox } from 'react-native';
+import * as Linking from 'expo-linking';
+
+LogBox.ignoreLogs([
+  'AuthApiError: Invalid Refresh Token',
+]);
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -36,8 +41,35 @@ export default function App() {
       }
     );
 
+    // 3. Listen for deep links (Supabase auth tokens)
+    const handleDeepLink = (event: Linking.EventType) => {
+      const url = event.url;
+      if (url && url.includes('#access_token=')) {
+        const hash = url.split('#')[1];
+        const params = hash.split('&').reduce((acc, curr) => {
+          const [key, value] = curr.split('=');
+          acc[key] = value;
+          return acc;
+        }, {} as Record<string, string>);
+        
+        if (params.access_token && params.refresh_token) {
+          supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token
+          });
+        }
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url } as any);
+    });
+
+    const linkingSubscription = Linking.addEventListener('url', handleDeepLink);
+
     return () => {
       subscription.unsubscribe();
+      linkingSubscription.remove();
     };
   }, []);
 

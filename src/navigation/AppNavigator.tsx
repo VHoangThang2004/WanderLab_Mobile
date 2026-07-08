@@ -1,10 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme, useNavigation } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, TouchableOpacity, StyleSheet, Animated, PanResponder } from 'react-native';
+
+// Components
+import { GlobalHeader } from '../components/GlobalHeader';
 
 // Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -13,6 +17,7 @@ import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../screens/auth/ResetPasswordScreen';
 import { FeedScreen } from '../screens/home/FeedScreen';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
+
 // Diary Screens
 import { DiaryDetailScreen } from '../screens/diary/DiaryDetailScreen';
 import { CreateDiaryScreen } from '../screens/diary/CreateDiaryScreen';
@@ -23,9 +28,9 @@ import { SettingsScreen } from '../screens/profile/SettingsScreen';
 import { PartnerScreen } from '../screens/profile/PartnerScreen';
 import { GroupDetailScreen } from '../screens/profile/GroupDetailScreen';
 import { DiaryBookScreen } from '../screens/diary/DiaryBookScreen';
+import { DiaryBookDetailScreen } from '../screens/diary/DiaryBookDetailScreen';
+import { CreateDiaryBookScreen } from '../screens/diary/CreateDiaryBookScreen';
 import { EditDiaryScreen } from '../screens/diary/EditDiaryScreen';
-import { SubscriptionScreen } from '../screens/profile/SubscriptionScreen';
-import { MenuModalScreen } from '../screens/menu/MenuModalScreen';
 
 // Community Screens
 import { CreateGroupScreen } from '../screens/community/CreateGroupScreen';
@@ -48,48 +53,18 @@ import { CheckoutScreen } from '../screens/subscription/CheckoutScreen';
 // Auth store
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../hooks/useTheme';
-import { useTranslation } from '../hooks/useTranslation';
 import { colors as staticColors, gradients } from '../theme';
 
 const AuthStack = createNativeStackNavigator();
-const HomeStack = createNativeStackNavigator();
-const ExploreStack = createNativeStackNavigator();
-const ProfileStack = createNativeStackNavigator();
 const MainStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function HomeStackNavigator() {
-  return (
-    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
-      <HomeStack.Screen name="Feed" component={FeedScreen} />
-    </HomeStack.Navigator>
-  );
-}
-
-function ExploreStackNavigator() {
-  return (
-    <ExploreStack.Navigator screenOptions={{ headerShown: false }}>
-      <ExploreStack.Screen name="ExploreMain" component={ExploreScreen} />
-    </ExploreStack.Navigator>
-  );
-}
-
-function ProfileStackNavigator() {
-  return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
-      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
-      <ProfileStack.Screen name="Follows" component={FollowsScreen} />
-    </ProfileStack.Navigator>
-  );
-}
-
-const DummyComponent = () => null;
-
-function MainTabs({ navigation }: any) {
-  const { colors } = useTheme();
-  const { t } = useTranslation();
-
+function FloatingActionMenu() {
+  const navigation = useNavigation<any>();
   const pan = useRef(new Animated.ValueXY()).current;
+  const [expanded, setExpanded] = useState(false);
+  const animation = useRef(new Animated.Value(0)).current;
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
@@ -105,101 +80,85 @@ function MainTabs({ navigation }: any) {
     }),
   ).current;
 
+  const toggleMenu = () => {
+    const toValue = expanded ? 0 : 1;
+    setExpanded(!expanded);
+    Animated.spring(animation, {
+      toValue,
+      friction: 6,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleNavigate = (route: string) => {
+    toggleMenu();
+    navigation.navigate(route);
+  };
+
+  const bubble1Y = animation.interpolate({ inputRange: [0, 1], outputRange: [0, -70] });
+  const bubble2Y = animation.interpolate({ inputRange: [0, 1], outputRange: [0, -140] });
+  const bubble3Y = animation.interpolate({ inputRange: [0, 1], outputRange: [0, -210] });
+  const rotation = animation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
+
   return (
-    <View style={styles.mainTabsContainer}>
-      <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'home';
-          
-          switch (route.name) {
-            case 'HomeTab': iconName = focused ? 'home' : 'home-outline'; break;
-            case 'ExploreTab': iconName = focused ? 'compass' : 'compass-outline'; break;
-            case 'ProfileTab': iconName = focused ? 'person' : 'person-outline'; break;
-            case 'MenuTab': iconName = focused ? 'grid' : 'grid-outline'; break;
-          }
-
-          if (focused) {
-            return (
-              <View style={{ width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
-                <LinearGradient
-                  colors={gradients.primary}
-                  style={{ width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}
-                >
-                  <Ionicons name={iconName} size={size} color="#fff" />
-                </LinearGradient>
-              </View>
-            );
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: 85,
-          paddingBottom: 20,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
-      })}
+    <Animated.View
+      style={[
+        styles.floatingContainer,
+        { transform: [{ translateX: pan.x }, { translateY: pan.y }] }
+      ]}
+      {...panResponder.panHandlers}
     >
-      <Tab.Screen name="HomeTab" component={HomeStackNavigator} options={{ tabBarLabel: t('navigation.home') }} />
-      <Tab.Screen name="ExploreTab" component={ExploreStackNavigator} options={{ tabBarLabel: t('navigation.explore') }} />
-      <Tab.Screen name="ProfileTab" component={ProfileStackNavigator} options={{ tabBarLabel: t('navigation.profile') }} />
-      <Tab.Screen 
-        name="MenuTab" 
-        component={DummyComponent}
-        options={{ tabBarLabel: t('navigation.more') }}
-        listeners={{
-          tabPress: e => {
-            e.preventDefault(); // Prevent default action
-            navigation.navigate('MenuModal');
-          },
-        }}
-      />
-      </Tab.Navigator>
-
-      <Animated.View
-        style={[
-          styles.floatingBubble,
-          { transform: [{ translateX: pan.x }, { translateY: pan.y }] }
-        ]}
-        {...panResponder.panHandlers}
-      >
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('AIAssistant')}
-        >
-          <LinearGradient
-            colors={gradients.primary}
-            style={styles.floatingBubbleGradient}
-          >
-            <Ionicons name="sparkles" size={24} color="#fff" />
+      {/* Option 3: Create Itinerary (Diamond/Triangle shape) */}
+      <Animated.View style={[styles.subBubbleWrapper, { transform: [{ translateY: bubble3Y }, { scale: animation }] }]}>
+        <TouchableOpacity style={styles.subBubble} activeOpacity={0.8} onPress={() => handleNavigate('CreateItinerary')}>
+          <LinearGradient colors={['#f59e0b', '#d97706']} style={[styles.subBubbleGradient, { borderRadius: 12, transform: [{ rotate: '45deg' }] }]}>
+            <View style={{ transform: [{ rotate: '-45deg' }] }}>
+              <Ionicons name="map-outline" size={22} color="#fff" />
+            </View>
           </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
-    </View>
+
+      {/* Option 2: Create Diary (Square shape) */}
+      <Animated.View style={[styles.subBubbleWrapper, { transform: [{ translateY: bubble2Y }, { scale: animation }] }]}>
+        <TouchableOpacity style={styles.subBubble} activeOpacity={0.8} onPress={() => handleNavigate('CreateDiary')}>
+          <LinearGradient colors={['#10b981', '#059669']} style={[styles.subBubbleGradient, { borderRadius: 12 }]}>
+            <Ionicons name="book-outline" size={22} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Option 1: AI Assistant (Teardrop/Circle shape) */}
+      <Animated.View style={[styles.subBubbleWrapper, { transform: [{ translateY: bubble1Y }, { scale: animation }] }]}>
+        <TouchableOpacity style={styles.subBubble} activeOpacity={0.8} onPress={() => handleNavigate('AIAssistant')}>
+          <LinearGradient colors={gradients.primary} style={[styles.subBubbleGradient, { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomRightRadius: 24, borderBottomLeftRadius: 6 }]}>
+            <Ionicons name="color-wand" size={22} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Main Button */}
+      <TouchableOpacity style={styles.mainBubble} activeOpacity={0.8} onPress={toggleMenu}>
+        <Animated.View style={{ transform: [{ rotate: rotation }], width: '100%', height: '100%' }}>
+          <LinearGradient colors={gradients.primary} style={styles.mainBubbleGradient}>
+            <Ionicons name="add" size={32} color="#fff" />
+          </LinearGradient>
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  mainTabsContainer: {
-    flex: 1,
-  },
-  floatingBubble: {
+  floatingContainer: {
     position: 'absolute',
-    bottom: 105,
+    bottom: 30,
     right: 16,
+    width: 56,
+    height: 56,
+    zIndex: 999,
+  },
+  mainBubble: {
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -208,46 +167,91 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.27,
     shadowRadius: 4.65,
-    zIndex: 999,
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
   },
-  floatingBubbleGradient: {
+  mainBubbleGradient: {
     flex: 1,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  subBubbleWrapper: {
+    position: 'absolute',
+    bottom: 4, // Center aligned with the main button
+    right: 4,
+    width: 48,
+    height: 48,
+  },
+  subBubble: {
+    flex: 1,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  subBubbleGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
+
+function AppShellNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        header: (props) => <GlobalHeader {...props} />,
+        tabBarStyle: { display: 'none' }, // Hides the bottom tab bar
+      }}
+    >
+      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="ExploreMain" component={ExploreScreen} />
+      <Tab.Screen name="ProfileMain" component={ProfileScreen} />
+      <Tab.Screen name="Follows" component={FollowsScreen} />
+      <Tab.Screen name="MessageList" component={MessageListScreen} />
+      <Tab.Screen name="Notifications" component={NotificationScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
+}
 
 function MainNavigator() {
   return (
-    <MainStack.Navigator screenOptions={{ headerShown: false }}>
-      <MainStack.Screen name="MainTabs" component={MainTabs} />
-      <MainStack.Screen name="MessageList" component={MessageListScreen} />
-      <MainStack.Screen name="Chat" component={ChatScreen} />
-      <MainStack.Screen name="Call" component={CallScreen} options={{ presentation: 'fullScreenModal' }} />
-      <MainStack.Screen name="Notifications" component={NotificationScreen} />
-      <MainStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
-      <MainStack.Screen name="CreateDiary" component={CreateDiaryScreen} options={{ presentation: 'fullScreenModal' }} />
-      <MainStack.Screen name="EditDiary" component={EditDiaryScreen} options={{ presentation: 'fullScreenModal' }} />
-      <MainStack.Screen name="Comment" component={CommentScreen} options={{ presentation: 'modal' }} />
-      <MainStack.Screen name="MenuModal" component={MenuModalScreen} options={{ presentation: 'transparentModal', animation: 'fade' }} />
-      <MainStack.Screen name="GroupDetail" component={GroupDetailScreen} />
-      <MainStack.Screen name="Partner" component={PartnerScreen} />
-      <MainStack.Screen name="Subscription" component={SubscriptionScreen} />
-      <MainStack.Screen name="Settings" component={SettingsScreen} />
-      <MainStack.Screen name="Follows" component={FollowsScreen} />
-      <MainStack.Screen name="DiaryBook" component={DiaryBookScreen} />
-      
-      {/* Community */}
-      <MainStack.Screen name="CreateGroup" component={CreateGroupScreen} />
-      <MainStack.Screen name="JoinGroup" component={JoinGroupScreen} />
-      
-      {/* Phase 3 Screens */}
-      <MainStack.Screen name="CreateItinerary" component={CreateItineraryScreen} />
-      <MainStack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ presentation: 'modal' }} />
-      <MainStack.Screen name="SubscriptionV2" component={SubscriptionScreenV2} options={{ presentation: 'fullScreenModal' }} />
-      <MainStack.Screen name="Checkout" component={CheckoutScreen} />
-    </MainStack.Navigator>
+    <View style={{ flex: 1 }}>
+      <MainStack.Navigator screenOptions={{ headerShown: false }}>
+        {/* App Shell handles the global header and main tab screens */}
+        <MainStack.Screen name="AppShell" component={AppShellNavigator} />
+        
+        {/* Screens outside AppShell will not have the GlobalHeader */}
+        <MainStack.Screen name="Chat" component={ChatScreen} />
+        <MainStack.Screen name="Call" component={CallScreen} options={{ presentation: 'fullScreenModal' }} />
+        <MainStack.Screen name="DiaryDetail" component={DiaryDetailScreen} />
+        <MainStack.Screen name="CreateDiary" component={CreateDiaryScreen} options={{ presentation: 'fullScreenModal' }} />
+        <MainStack.Screen name="EditDiary" component={EditDiaryScreen} options={{ presentation: 'fullScreenModal' }} />
+        <MainStack.Screen name="Comment" component={CommentScreen} options={{ presentation: 'modal' }} />
+        <MainStack.Screen name="GroupDetail" component={GroupDetailScreen} />
+        <MainStack.Screen name="Partner" component={PartnerScreen} />
+        <MainStack.Screen name="Subscription" component={SubscriptionScreenV2} />
+        <MainStack.Screen name="DiaryBook" component={DiaryBookScreen} />
+        <MainStack.Screen name="DiaryBookDetail" component={DiaryBookDetailScreen} />
+        <MainStack.Screen name="CreateDiaryBook" component={CreateDiaryBookScreen} options={{ presentation: 'fullScreenModal' }} />
+        
+        {/* Community */}
+        <MainStack.Screen name="CreateGroup" component={CreateGroupScreen} />
+        <MainStack.Screen name="JoinGroup" component={JoinGroupScreen} />
+        
+        {/* Phase 3 Screens */}
+        <MainStack.Screen name="CreateItinerary" component={CreateItineraryScreen} />
+        <MainStack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ presentation: 'modal' }} />
+        <MainStack.Screen name="SubscriptionV2" component={SubscriptionScreenV2} options={{ presentation: 'fullScreenModal' }} />
+        <MainStack.Screen name="Checkout" component={CheckoutScreen} />
+        <MainStack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ presentation: 'modal' }} />
+      </MainStack.Navigator>
+      <FloatingActionMenu />
+    </View>
   );
 }
 
@@ -290,8 +294,17 @@ export function AppNavigator() {
     },
   };
 
+  const linking = {
+    prefixes: [Linking.createURL('/'), 'wanderlab://'],
+    config: {
+      screens: {
+        ResetPassword: 'reset-password',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer theme={customTheme}>
+    <NavigationContainer theme={customTheme} linking={linking}>
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

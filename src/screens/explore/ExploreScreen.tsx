@@ -117,7 +117,7 @@ export function ExploreScreen({ navigation }: ExploreScreenProps) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <FlatList
         data={filteredDiaries}
         keyExtractor={(item) => item.id}

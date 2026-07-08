@@ -207,7 +207,7 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
           <>
             <TouchableOpacity 
               style={[styles.btn, styles.secondaryBtn, { flex: 1 }]} 
-              onPress={() => navigation.navigate('MessageList')}
+              onPress={() => navigation.navigate('Chat', { contactId: item.id, contactName: item.full_name, contactAvatar: item.avatar_url })}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.text} style={{ marginRight: 6 }} />
               <Text style={styles.secondaryBtnText}>Nhắn tin</Text>
@@ -245,15 +245,8 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Bạn Bè</Text>
-          <View style={{ width: 40 }} />
-        </View>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
           <TextInput 
@@ -318,7 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    paddingBottom: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   headerTop: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

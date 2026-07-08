@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 interface UserAvatarProps {
   src?: string | null;
   name: string;
-  style?: ViewStyle;
+  style?: any;
 }
 
 export function UserAvatar({ src, name, style }: UserAvatarProps) {

@@ -1,39 +1,35 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
-import { diaryService } from '../../api/diaryService';
+import { diaryBookService } from '../../api/diaryBookService';
+import { useAuthStore } from '../../stores/authStore';
 import { colors, typography, spacing, borderRadius } from '../../theme';
-
-const { width } = Dimensions.get('window');
-const PAGE_WIDTH = width * 0.85;
 
 export function DiaryBookScreen() {
   const navigation = useNavigation<any>();
-  const { data: diaries, isLoading } = useQuery({
-    queryKey: ['myDiaries'],
-    queryFn: diaryService.fetchMyDiaries,
+  const user = useAuthStore((state) => state.user);
+
+  const { data: books, isLoading } = useQuery({
+    queryKey: ['diaryBooks', user?.id],
+    queryFn: () => diaryBookService.fetchUserBooks(user?.id as string),
+    enabled: !!user?.id,
   });
 
-  const renderPage = ({ item, index }: any) => {
+  const renderBook = ({ item }: any) => {
     return (
       <TouchableOpacity 
-        style={styles.pageContainer} 
-        activeOpacity={0.9}
-        onPress={() => navigation.navigate('DiaryDetail', { id: item.id })}
+        style={styles.bookCard} 
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('DiaryBookDetail', { bookId: item.id })}
       >
-        <Image source={{ uri: item.image }} style={styles.pageImage} contentFit="cover" />
-        <View style={styles.pageContent}>
-          <Text style={styles.pageDate}>{item.date}</Text>
-          <Text style={styles.pageTitle} numberOfLines={2}>{item.location}</Text>
-          <Text style={styles.pageDescription} numberOfLines={3}>{item.caption}</Text>
-          
-          <View style={styles.pageFooter}>
-            <Text style={styles.pageNumber}>Trang {index + 1}</Text>
-          </View>
+        <Image source={{ uri: item.cover_image_url }} style={styles.bookCover} contentFit="cover" />
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.bookCount}>{item.diaries_count || 0} bài viết</Text>
         </View>
       </TouchableOpacity>
     );
@@ -45,9 +41,12 @@ export function DiaryBookScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cuốn nhật ký của tôi</Text>
-        <TouchableOpacity style={styles.backBtn}>
-          <Ionicons name="share-outline" size={24} color={colors.text} />
+        <Text style={styles.headerTitle}>Kệ Sách Của Tôi</Text>
+        <TouchableOpacity 
+          style={styles.backBtn}
+          onPress={() => navigation.navigate('CreateDiaryBook')}
+        >
+          <Ionicons name="add" size={26} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -55,97 +54,81 @@ export function DiaryBookScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : diaries?.length === 0 ? (
+      ) : books?.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>Bạn chưa có bài nhật ký nào.</Text>
+          <Ionicons name="book-outline" size={64} color={colors.textTertiary} style={{ marginBottom: spacing.md }} />
+          <Text style={styles.emptyTitle}>Kệ sách đang trống</Text>
+          <Text style={styles.emptyText}>Gom nhóm các bài nhật ký của bạn thành những cuốn sách tuyệt đẹp.</Text>
+          <TouchableOpacity 
+            style={styles.createBtn}
+            onPress={() => navigation.navigate('CreateDiaryBook')}
+          >
+            <Text style={styles.createBtnText}>Tạo cuốn sách đầu tiên</Text>
+          </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.bookWrapper}>
-          <FlatList
-            data={diaries}
-            keyExtractor={(item) => item.id}
-            renderItem={renderPage}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-            snapToInterval={PAGE_WIDTH + spacing.md}
-            decelerationRate="fast"
-          />
-        </View>
+        <FlatList
+          data={books}
+          keyExtractor={(item) => item.id}
+          renderItem={renderBook}
+          numColumns={2}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.columnWrapper}
+        />
       )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0dfc8' }, // Book cover background color
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.base, paddingVertical: spacing.sm,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.card,
   },
   backBtn: { padding: spacing.xs },
   headerTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { fontSize: typography.base, color: colors.textSecondary },
-  bookWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  emptyTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text, marginBottom: spacing.sm },
+  emptyText: { fontSize: typography.base, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.xl },
+  createBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
   },
-  listContent: {
-    paddingHorizontal: (width - PAGE_WIDTH) / 2,
-    alignItems: 'center',
-  },
-  pageContainer: {
-    width: PAGE_WIDTH,
-    height: width * 1.3,
-    backgroundColor: '#fff',
-    borderRadius: borderRadius.lg,
-    marginHorizontal: spacing.md / 2,
-    shadowColor: '#000',
-    shadowOffset: { width: -5, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
+  createBtnText: { color: '#fff', fontSize: typography.base, fontWeight: typography.bold },
+  listContent: { padding: spacing.md, paddingBottom: 100 },
+  columnWrapper: { justifyContent: 'space-between', marginBottom: spacing.md },
+  bookCard: {
+    width: '48%',
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.md,
     overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  pageImage: {
+  bookCover: {
     width: '100%',
-    height: '50%',
+    height: 180,
+    backgroundColor: colors.border,
   },
-  pageContent: {
-    flex: 1,
-    padding: spacing.xl,
+  bookInfo: {
+    padding: spacing.sm,
   },
-  pageDate: {
-    fontSize: typography.sm,
-    color: colors.textTertiary,
-    fontStyle: 'italic',
-    marginBottom: spacing.xs,
-  },
-  pageTitle: {
-    fontSize: typography.xl,
+  bookTitle: {
+    fontSize: typography.base,
     fontWeight: typography.bold,
     color: colors.text,
-    marginBottom: spacing.sm,
+    marginBottom: 4,
   },
-  pageDescription: {
-    fontSize: typography.base,
-    color: colors.textSecondary,
-    lineHeight: 24,
-  },
-  pageFooter: {
-    position: 'absolute',
-    bottom: spacing.lg,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  pageNumber: {
+  bookCount: {
     fontSize: typography.sm,
-    color: colors.textTertiary,
-    fontFamily: 'Courier',
+    color: colors.textSecondary,
   },
 });

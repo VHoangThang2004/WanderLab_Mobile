@@ -126,7 +126,7 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
-        style={styles.flex1} 
+        style={{ flex: 1 }} 
         behavior="padding"
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >

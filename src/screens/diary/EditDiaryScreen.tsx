@@ -70,7 +70,7 @@ export function EditDiaryScreen() {
 
   // Step 4: Privacy
   const [privacy, setPrivacy] = useState<'public' | 'friends' | 'private'>(
-    diary?.status === 'draft' ? 'private' : 'public'
+    (diary as any)?.status === 'draft' ? 'private' : 'public'
   );
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Default true when editing
 

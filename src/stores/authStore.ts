@@ -121,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
             password,
             options: {
               data: { full_name: fullName },
+              emailRedirectTo: 'wanderlab://',
             },
           });
 
@@ -141,7 +142,12 @@ export const useAuthStore = create<AuthState>()(
 
       refreshSession: async () => {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
 
           if (session?.user) {
             const profile = await fetchProfile(session.user);
