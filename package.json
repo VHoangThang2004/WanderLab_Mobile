@@ -49,5 +49,19 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-webrtc"
+        ]
+      }
+    },
+    "install": {
+      "exclude": [
+        "react-native-worklets"
+      ]
+    }
+  }
 }
