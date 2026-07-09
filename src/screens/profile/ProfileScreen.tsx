@@ -32,9 +32,10 @@ const { width } = Dimensions.get('window');
 
 interface ProfileScreenProps {
   navigation: any;
+  route: any;
 }
 
-export function ProfileScreen({ navigation }: ProfileScreenProps) {
+export function ProfileScreen({ navigation, route }: ProfileScreenProps) {
   const { user, logout, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = React.useState<'diaries' | 'itineraries' | 'stats'>('diaries');
   const [isUploading, setIsUploading] = React.useState(false);
@@ -60,6 +61,12 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     if (!myDiaries) return [];
     return myDiaries.map((d: any) => d.location).filter(Boolean);
   }, [myDiaries]);
+
+  React.useEffect(() => {
+    if (route.params?.activeTab) {
+      setActiveTab(route.params.activeTab);
+    }
+  }, [route.params?.activeTab]);
 
   React.useEffect(() => {
     if (activeTab === 'itineraries') {
@@ -389,7 +396,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
                 >
                   <View style={styles.itineraryHero}>
                     <Image 
-                      source={it.destinationImage || 'https://images.unsplash.com/photo-1599514605917-76b91c95973e'} 
+                      source={{ uri: it.destinationImage || 'https://images.unsplash.com/photo-1599514605917-76b91c95973e' }} 
                       style={styles.itineraryImage} 
                       contentFit="cover" 
                     />

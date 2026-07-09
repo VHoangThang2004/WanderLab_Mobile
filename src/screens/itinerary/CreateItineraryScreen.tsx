@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,14 +23,7 @@ import { useUsageLimits } from '../../hooks/useUsageLimits';
 
 const { width } = Dimensions.get('window');
 
-const DESTINATIONS = [
-  { id: "pq", name: "Phú Quốc", tag: "Biển & Đảo", image: "https://images.unsplash.com/photo-1693282815546-f7eeb0fa909b?w=400" },
-  { id: "hl", name: "Hạ Long", tag: "Kỳ quan", image: "https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=400" },
-  { id: "hn", name: "Hà Nội", tag: "Thành phố", image: "https://images.unsplash.com/photo-1727860628226-2d545134f8a9?w=400" },
-  { id: "hoi", name: "Hội An", tag: "Văn hóa", image: "https://images.unsplash.com/photo-1643030080539-b411caf44c37?w=400" },
-  { id: "dn", name: "Đà Nẵng", tag: "Biển", image: "https://images.unsplash.com/flagged/photo-1583863374731-4224cbbc8c36?w=400" },
-  { id: "sp", name: "Sa Pa", tag: "Trekking", image: "https://images.unsplash.com/photo-1694152362587-99d77d21793b?w=400" },
-];
+import { ALL_VIETNAM_DESTINATIONS } from '../../data/vietnamDestinations';
 
 const DURATIONS = ["3 ngày", "4 ngày", "5 ngày", "6 ngày", "7 ngày"];
 const GROUP_SIZES = ["1 mình", "Cặp đôi", "Nhóm bạn (3–5)", "Gia đình", "Đoàn lớn (6+)"];
@@ -60,7 +54,14 @@ export function CreateItineraryScreen({ navigation }: any) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [itineraryResult, setItineraryResult] = useState<any>(null);
+  const [selectedRegion, setSelectedRegion] = useState("Tất cả");
   const { checkLimit, incrementUsage } = useUsageLimits();
+
+  const REGIONS = ["Tất cả", "Miền Bắc", "Miền Trung", "Miền Nam"];
+
+  const filteredDestinations = selectedRegion === "Tất cả" 
+    ? ALL_VIETNAM_DESTINATIONS 
+    : ALL_VIETNAM_DESTINATIONS.filter(d => d.region === selectedRegion);
 
   React.useEffect(() => {
     checkLimit('create_itinerary', true).then(allowed => {
@@ -68,7 +69,7 @@ export function CreateItineraryScreen({ navigation }: any) {
     });
   }, []);
 
-  const selectedDest = DESTINATIONS.find((d) => d.id === destination) || DESTINATIONS[0];
+  const selectedDest = ALL_VIETNAM_DESTINATIONS.find((d) => d.id === destination) || ALL_VIETNAM_DESTINATIONS[0];
 
   const handleGenerate = async () => {
     const aiAllowed = await checkLimit('ai_itinerary', true);
@@ -185,27 +186,50 @@ export function CreateItineraryScreen({ navigation }: any) {
 
         {step === 1 && (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Bạn muốn đi đâu?</Text>
-            <View style={styles.gridContainer}>
-              {DESTINATIONS.map(dest => (
-                <TouchableOpacity 
-                  key={dest.id} 
-                  style={[styles.destCard, destination === dest.id && styles.destCardActive]}
-                  onPress={() => setDestination(dest.id)}
-                >
-                  <Image source={{ uri: dest.image }} style={styles.destImage} contentFit="cover" />
-                  <View style={styles.destOverlay} />
-                  {destination === dest.id && (
-                    <View style={styles.checkIcon}>
-                      <Ionicons name="checkmark" size={12} color="#fff" />
-                    </View>
-                  )}
-                  <View style={styles.destInfo}>
-                    <Text style={styles.destName}>{dest.name}</Text>
-                    <Text style={styles.destTag}>{dest.tag}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+            <View>
+              <Text style={styles.stepTitle}>Bạn muốn đi đâu?</Text>
+              <Text style={styles.stepSubtitle}>Chọn điểm đến mơ ước của bạn</Text>
+            </View>
+            <View style={{ marginBottom: spacing.sm }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.lg }}>
+                {REGIONS.map(region => (
+                  <TouchableOpacity
+                    key={region}
+                    style={[styles.regionChip, selectedRegion === region && styles.regionChipActive]}
+                    onPress={() => setSelectedRegion(region)}
+                  >
+                    <Text style={[styles.regionChipText, selectedRegion === region && styles.regionChipTextActive]}>
+                      {region}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={[styles.gridContainerWrapper, { maxHeight: 350 }]}>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                <View style={styles.gridContainer}>
+                  {filteredDestinations.map(dest => (
+                    <TouchableOpacity 
+                      key={dest.id} 
+                      style={[styles.destCard, destination === dest.id && styles.destCardActive]}
+                      onPress={() => setDestination(dest.id)}
+                    >
+                      <Image source={{ uri: dest.image }} style={styles.destImage} contentFit="cover" />
+                      <View style={styles.destOverlay} />
+                      {destination === dest.id && (
+                        <View style={styles.checkIcon}>
+                          <Ionicons name="checkmark" size={12} color="#fff" />
+                        </View>
+                      )}
+                      <View style={styles.destInfo}>
+                        <Text style={styles.destName} numberOfLines={1}>{dest.name}</Text>
+                        <Text style={styles.destTag} numberOfLines={1}>{dest.tag}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
 
             <Text style={[styles.stepTitle, { marginTop: spacing.lg }]}>Thời gian đi</Text>
@@ -306,53 +330,90 @@ export function CreateItineraryScreen({ navigation }: any) {
 
         {step === 4 && itineraryResult && (
           <View style={styles.resultContainer}>
+            {/* AI Notes */}
+            {itineraryResult.ai_notes && (
+              <View style={styles.aiNotesCard}>
+                <Text style={styles.aiNotesText}>🤖 {itineraryResult.ai_notes}</Text>
+              </View>
+            )}
+
             <LinearGradient colors={gradients.primary} style={styles.resultHeader}>
-              <Text style={styles.resultDest}>{itineraryResult.title || `${selectedDest.name} · ${duration}`}</Text>
-              <Text style={styles.resultMeta}>👥 {groupSize}   💰 {budget}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <Ionicons name="sparkles" size={16} color="#fff" />
+                <Text style={styles.resultHeaderTag}>KẾT QUẢ ĐỀ XUẤT</Text>
+              </View>
+              <Text style={styles.resultDest}>{selectedDest.name} · {duration}</Text>
+              <View style={styles.resultMetaRow}>
+                <View style={styles.resultMetaBadge}>
+                  <Ionicons name="people" size={12} color="#fff" />
+                  <Text style={styles.resultMetaText}>{groupSize}</Text>
+                </View>
+                <View style={styles.resultMetaBadge}>
+                  <Ionicons name="wallet" size={12} color="#fff" />
+                  <Text style={styles.resultMetaText}>{budget}</Text>
+                </View>
+                <View style={styles.resultMetaBadge}>
+                  <Ionicons name="star" size={12} color="#fff" />
+                  <Text style={styles.resultMetaText}>Độ phù hợp 96%</Text>
+                </View>
+              </View>
             </LinearGradient>
 
-            <Text style={styles.resultSubtitle}>Lịch trình chi tiết</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="calendar" size={20} color={colors.primary} />
+              <Text style={styles.resultSubtitle}>Lịch trình chi tiết</Text>
+            </View>
+
             {itineraryResult.days.map((day: any) => (
-              <View key={day.day} style={styles.dayCard}>
-                <View style={styles.dayHeader}>
-                  <Text style={styles.dayNumber}>NGÀY {day.day}</Text>
-                  <Text style={styles.dayBudget}>~{day.budget}</Text>
-                </View>
-                <Text style={styles.dayTitle}>{day.title}</Text>
-                {day.activities.map((act: string, idx: number) => (
-                  <View key={idx} style={styles.actRow}>
-                    <View style={styles.actDot} />
-                    <Text style={styles.actText}>{act}</Text>
+              <View key={day.day} style={styles.dayCard2}>
+                <View style={styles.dayHeader2}>
+                  <View style={styles.dayHeaderLeft}>
+                    <Text style={{ fontSize: 24 }}>{day.emoji || '☀️'}</Text>
+                    <View style={{ marginLeft: spacing.sm }}>
+                      <Text style={styles.dayNumber2}>NGÀY {day.day}</Text>
+                      <Text style={styles.dayTitle2}>{day.title}</Text>
+                    </View>
                   </View>
-                ))}
+                  <View style={styles.dayBudgetBadge2}>
+                    <Text style={styles.dayBudgetText2}>~{day.budget}</Text>
+                  </View>
+                </View>
+                <View style={styles.dayBody2}>
+                  {day.activities.map((act: string, idx: number) => (
+                    <View key={idx} style={styles.actRow2}>
+                      <View style={styles.actDot2} />
+                      <Text style={styles.actText2}>{act}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             ))}
 
-            <View style={styles.dayCard}>
-              <Text style={[styles.dayTitle, { marginBottom: spacing.sm }]}>Ước tính chi phí</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="wallet" size={20} color={colors.primary} />
+              <Text style={styles.resultSubtitle}>Ước tính chi phí</Text>
+            </View>
+
+            <View style={styles.dayCard2}>
               {itineraryResult.budgetBreakdown?.map((cost: any, idx: number) => (
-                <View key={idx} style={styles.costRow}>
-                  <Text style={styles.costLabel}>{cost.label}</Text>
-                  <Text style={styles.costVal}>{cost.amount}</Text>
+                <View key={idx} style={styles.costRow2}>
+                  <Text style={styles.costLabel2}>{cost.label}</Text>
+                  <Text style={styles.costVal2}>{cost.amount}</Text>
                 </View>
               ))}
-              <View style={[styles.costRow, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.sm }]}>
-                <Text style={[styles.costLabel, { fontWeight: 'bold' }]}>Tổng cộng</Text>
-                <Text style={[styles.costVal, { color: colors.primary, fontSize: 16 }]}>{itineraryResult.totalBudget}</Text>
+              <View style={styles.costTotalRow2}>
+                <Text style={styles.costTotalLabel2}>Tổng cộng</Text>
+                <Text style={styles.costTotalVal2}>{itineraryResult.totalBudget}</Text>
               </View>
             </View>
 
-            <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.actionBtnOutline} onPress={() => setStep(1)}>
-                <Ionicons name="refresh" size={20} color={colors.text} />
-                <Text style={styles.actionBtnTextOutline}>Làm lại</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtnOutline} onPress={handleExportPDF}>
-                <Ionicons name="document-text" size={20} color={colors.text} />
-                <Text style={styles.actionBtnTextOutline}>Xuất PDF</Text>
+            <View style={styles.actionRow2}>
+              <TouchableOpacity style={styles.actionBtnOutline2} onPress={() => setStep(1)}>
+                <Ionicons name="refresh" size={20} color={colors.textSecondary} />
+                <Text style={styles.actionBtnTextOutline2}>Làm lại</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.actionBtnSolid, isSaved && { backgroundColor: '#10b981' }]} 
+                style={[styles.actionBtnSolid2, isSaved && { backgroundColor: '#10b981' }]} 
                 onPress={async () => {
                   setIsSaved(true);
                   try {
@@ -361,9 +422,12 @@ export function CreateItineraryScreen({ navigation }: any) {
                     saved.unshift({
                       id: Date.now().toString(),
                       destination: selectedDest.name,
+                      destinationImage: selectedDest.image,
+                      destinationRegion: selectedDest.region,
                       duration,
                       groupSize,
                       budget,
+                      interests,
                       createdAt: new Date().toISOString(),
                       data: itineraryResult
                     });
@@ -371,11 +435,16 @@ export function CreateItineraryScreen({ navigation }: any) {
                   } catch (e) {
                     console.error('Error saving itinerary', e);
                   }
-                  setTimeout(() => navigation.navigate('AppShell'), 1000);
+                  setTimeout(() => {
+                    navigation.navigate('AppShell', {
+                      screen: 'ProfileMain',
+                      params: { activeTab: 'itineraries' }
+                    });
+                  }, 1000);
                 }}
               >
                 <Ionicons name={isSaved ? "checkmark" : "bookmark"} size={20} color="#fff" />
-                <Text style={styles.actionBtnTextSolid}>{isSaved ? "Đã lưu" : "Lưu lại"}</Text>
+                <Text style={styles.actionBtnTextSolid2}>{isSaved ? "Đã lưu" : "Lưu lại"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -406,10 +475,17 @@ const styles = StyleSheet.create({
   progressLineActive: { backgroundColor: colors.primary },
 
   stepContainer: { gap: spacing.md },
-  stepTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text, marginBottom: spacing.xs },
+  stepTitle: { fontSize: typography.xl, fontWeight: typography.bold, color: colors.text, marginBottom: 2 },
+  stepSubtitle: { fontSize: typography.sm, color: colors.textSecondary, marginBottom: spacing.xs },
   
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  destCard: { width: (width - 32 - spacing.sm) / 2, height: 120, borderRadius: borderRadius.lg, overflow: 'hidden', position: 'relative', borderWidth: 2, borderColor: 'transparent' },
+  regionChip: { paddingHorizontal: spacing.lg, paddingVertical: 10, borderRadius: 24, backgroundColor: '#e5e7eb', marginRight: spacing.sm },
+  regionChipActive: { backgroundColor: colors.primary },
+  regionChipText: { fontSize: typography.sm, color: '#374151', fontWeight: '600' },
+  regionChipTextActive: { color: '#fff' },
+  
+  gridContainerWrapper: { borderRadius: borderRadius.lg, overflow: 'hidden' },
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  destCard: { width: '48%', height: 120, borderRadius: borderRadius.lg, overflow: 'hidden', position: 'relative', borderWidth: 2, borderColor: 'transparent', marginBottom: spacing.sm },
   destCardActive: { borderColor: colors.primary },
   destImage: { width: '100%', height: '100%' },
   destOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
@@ -448,27 +524,42 @@ const styles = StyleSheet.create({
   generateBtnText: { color: '#fff', fontSize: typography.md, fontWeight: 'bold' },
 
   resultContainer: { gap: spacing.md },
-  resultHeader: { padding: spacing.lg, borderRadius: borderRadius.lg },
-  resultDest: { color: '#fff', fontSize: typography.xl, fontWeight: 'bold', marginBottom: 4 },
-  resultMeta: { color: 'rgba(255,255,255,0.9)', fontSize: typography.sm },
+  aiNotesCard: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: borderRadius.lg, padding: spacing.md },
+  aiNotesText: { color: '#1e40af', fontSize: typography.sm, fontWeight: '500', lineHeight: 20 },
   
-  resultSubtitle: { fontSize: typography.lg, fontWeight: 'bold', color: colors.text, marginTop: spacing.sm },
-  dayCard: { backgroundColor: '#fff', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
-  dayHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
-  dayNumber: { fontSize: 12, fontWeight: 'bold', color: colors.primary },
-  dayBudget: { fontSize: 12, fontWeight: 'bold', color: colors.primary, backgroundColor: colors.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  dayTitle: { fontSize: typography.base, fontWeight: 'bold', color: colors.text, marginBottom: spacing.sm },
-  actRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },
-  actDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 6 },
-  actText: { flex: 1, fontSize: typography.sm, color: colors.textSecondary },
-
-  costRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  costLabel: { fontSize: typography.sm, color: colors.textSecondary },
-  costVal: { fontSize: typography.sm, fontWeight: 'bold', color: colors.text },
-
-  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  actionBtnOutline: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
-  actionBtnTextOutline: { fontSize: typography.sm, fontWeight: 'bold', color: colors.text },
-  actionBtnSolid: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, backgroundColor: colors.primary },
-  actionBtnTextSolid: { fontSize: typography.sm, fontWeight: 'bold', color: '#fff' },
+  resultHeader: { padding: spacing.lg, borderRadius: borderRadius.xl, marginBottom: spacing.xs },
+  resultHeaderTag: { color: '#fff', fontSize: 12, fontWeight: 'bold', marginLeft: 6 },
+  resultDest: { color: '#fff', fontSize: typography['2xl'], fontWeight: 'bold', marginBottom: spacing.sm },
+  resultMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  resultMetaBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  resultMetaText: { color: '#fff', fontSize: 12, marginLeft: 4, fontWeight: '600' },
+  
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: 6 },
+  resultSubtitle: { fontSize: typography.lg, fontWeight: 'bold', color: colors.text },
+  
+  dayCard2: { backgroundColor: '#fff', borderRadius: borderRadius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  dayHeader2: { backgroundColor: 'rgba(255,49,49,0.05)', padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
+  dayHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
+  dayNumber2: { fontSize: 12, fontWeight: 'bold', color: colors.primary, marginBottom: 2 },
+  dayTitle2: { fontSize: typography.sm, fontWeight: 'bold', color: colors.text },
+  dayBudgetBadge2: { backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  dayBudgetText2: { fontSize: 12, fontWeight: 'bold', color: colors.primary },
+  
+  dayBody2: { padding: spacing.md, paddingTop: spacing.sm },
+  actRow2: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 10 },
+  actDot2: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 6 },
+  actText2: { flex: 1, fontSize: typography.sm, color: colors.textSecondary, lineHeight: 20 },
+  
+  costRow2: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md },
+  costLabel2: { fontSize: typography.sm, color: colors.textSecondary },
+  costVal2: { fontSize: typography.sm, fontWeight: 'bold', color: colors.text },
+  costTotalRow2: { flexDirection: 'row', justifyContent: 'space-between', padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, borderStyle: 'dashed' },
+  costTotalLabel2: { fontSize: typography.base, fontWeight: 'bold', color: colors.text },
+  costTotalVal2: { fontSize: typography.lg, fontWeight: 'bold', color: colors.primary },
+  
+  actionRow2: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  actionBtnOutline2: { flex: 1, paddingVertical: 14, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, backgroundColor: '#fff' },
+  actionBtnTextOutline2: { color: colors.textSecondary, fontWeight: 'bold', fontSize: typography.sm },
+  actionBtnSolid2: { flex: 2, paddingVertical: 14, borderRadius: borderRadius.lg, backgroundColor: colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  actionBtnTextSolid2: { color: '#fff', fontWeight: 'bold', fontSize: typography.sm },
 });
