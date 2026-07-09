@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
 import { aiService } from '../../api/aiService';
 import { useUsageLimits } from '../../hooks/useUsageLimits';
@@ -352,9 +353,25 @@ export function CreateItineraryScreen({ navigation }: any) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.actionBtnSolid, isSaved && { backgroundColor: '#10b981' }]} 
-                onPress={() => {
+                onPress={async () => {
                   setIsSaved(true);
-                  setTimeout(() => navigation.navigate('MainTabs'), 1000);
+                  try {
+                    const existing = await AsyncStorage.getItem('@saved_itineraries');
+                    const saved = existing ? JSON.parse(existing) : [];
+                    saved.unshift({
+                      id: Date.now().toString(),
+                      destination: selectedDest.name,
+                      duration,
+                      groupSize,
+                      budget,
+                      createdAt: new Date().toISOString(),
+                      data: itineraryResult
+                    });
+                    await AsyncStorage.setItem('@saved_itineraries', JSON.stringify(saved));
+                  } catch (e) {
+                    console.error('Error saving itinerary', e);
+                  }
+                  setTimeout(() => navigation.navigate('AppShell'), 1000);
                 }}
               >
                 <Ionicons name={isSaved ? "checkmark" : "bookmark"} size={20} color="#fff" />

@@ -19,6 +19,8 @@ export interface User {
   likes_received?: number;
   comments_received?: number;
   saves_received?: number;
+  countries_visited?: number;
+  cities_visited?: number;
   created_at: string;
   updated_at: string;
 }

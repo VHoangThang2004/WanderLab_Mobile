@@ -10,11 +10,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DiaryPostCard } from '../../components/DiaryPostCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { UserAvatar } from '../../components/UserAvatar';
 import { DropdownMenu } from '../../components/DropdownMenu';
+import { VietnamMap } from '../../components/VietnamMap';
+import { ItineraryDetailModal } from '../../components/ItineraryDetailModal';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
 import { useAuthStore } from '../../stores/authStore';
@@ -34,16 +38,71 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { user, logout, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = React.useState<'diaries' | 'itineraries' | 'stats'>('diaries');
   const [isUploading, setIsUploading] = React.useState(false);
+  const [savedItineraries, setSavedItineraries] = React.useState<any[]>([]);
+  const [selectedItinerary, setSelectedItinerary] = React.useState<any>(null);
+  const [engagementRate, setEngagementRate] = React.useState(0);
   const { colors, isDarkMode } = useTheme();
   const { t } = useTranslation();
   
   const styles = getStyles(colors, isDarkMode);
+
+  // Calculate engagement rate based on interactions vs followers
+  const totalInteractions = (user?.likes_received || 0) + (user?.comments_received || 0) + (user?.saves_received || 0);
+  const calculatedEngagementRate = user?.followers_count ? (totalInteractions / user.followers_count * 100).toFixed(1) : '0.0';
 
   const { data: myDiaries, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['myDiaries'],
     queryFn: diaryService.fetchMyDiaries,
     enabled: !!user,
   });
+
+  const visitedLocations = React.useMemo(() => {
+    if (!myDiaries) return [];
+    return myDiaries.map((d: any) => d.location).filter(Boolean);
+  }, [myDiaries]);
+
+  React.useEffect(() => {
+    if (activeTab === 'itineraries') {
+      loadSavedItineraries();
+    }
+  }, [activeTab]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (activeTab === 'itineraries') {
+        loadSavedItineraries();
+      }
+    }, [activeTab])
+  );
+
+  const loadSavedItineraries = async () => {
+    try {
+      const data = await AsyncStorage.getItem('@saved_itineraries');
+      if (data) {
+        setSavedItineraries(JSON.parse(data));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteItinerary = (id: string) => {
+    Alert.alert('Xóa lịch trình', 'Bạn có chắc muốn xóa lịch trình này?', [
+      { text: 'Hủy', style: 'cancel' },
+      { 
+        text: 'Xóa', 
+        style: 'destructive', 
+        onPress: async () => {
+          const filtered = savedItineraries.filter(i => i.id !== id);
+          setSavedItineraries(filtered);
+          await AsyncStorage.setItem('@saved_itineraries', JSON.stringify(filtered));
+          if (selectedItinerary?.id === id) {
+            setSelectedItinerary(null);
+          }
+        }
+      }
+    ]);
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -190,28 +249,44 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         )}
       </View>
 
-      {/* Stats */}
-      <View style={styles.statsBar}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{user.diaries_count}</Text>
-          <Text style={styles.statLabel}>{t('profile.diaries')}</Text>
+      {/* Modern Stats Grid */}
+      <View style={styles.modernStatsGrid}>
+        <View style={styles.modernStatItem}>
+          <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.modernStatIconBg}>
+            <Ionicons name="camera" size={20} color="#fff" />
+          </LinearGradient>
+          <View>
+            <Text style={styles.modernStatValue}>{user.diaries_count || 0}</Text>
+            <Text style={styles.modernStatLabel}>{t('profile.diaries')}</Text>
+          </View>
         </View>
-        <View style={styles.statDivider} />
-        <TouchableOpacity 
-          style={styles.statItem}
-          onPress={() => navigation.navigate('Follows', { initialTab: 'followers' })}
-        >
-          <Text style={styles.statValue}>{user.followers_count}</Text>
-          <Text style={styles.statLabel}>{t('profile.followers')}</Text>
+        <TouchableOpacity style={styles.modernStatItem} onPress={() => navigation.navigate('Follows', { initialTab: 'followers' })}>
+          <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.modernStatIconBg}>
+            <Ionicons name="heart" size={20} color="#fff" />
+          </LinearGradient>
+          <View>
+            <Text style={styles.modernStatValue}>{user.followers_count || 0}</Text>
+            <Text style={styles.modernStatLabel}>{t('profile.followers')}</Text>
+          </View>
         </TouchableOpacity>
-        <View style={styles.statDivider} />
-        <TouchableOpacity 
-          style={styles.statItem}
-          onPress={() => navigation.navigate('Follows', { initialTab: 'following' })}
-        >
-          <Text style={styles.statValue}>{user.following_count}</Text>
-          <Text style={styles.statLabel}>{t('profile.following')}</Text>
-        </TouchableOpacity>
+        <View style={styles.modernStatItem}>
+          <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.modernStatIconBg}>
+            <Ionicons name="globe" size={20} color="#fff" />
+          </LinearGradient>
+          <View>
+            <Text style={styles.modernStatValue}>{user.countries_visited || 0}</Text>
+            <Text style={styles.modernStatLabel}>Quốc gia</Text>
+          </View>
+        </View>
+        <View style={styles.modernStatItem}>
+          <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.modernStatIconBg}>
+            <Ionicons name="map" size={20} color="#fff" />
+          </LinearGradient>
+          <View>
+            <Text style={styles.modernStatValue}>{user.cities_visited || 0}</Text>
+            <Text style={styles.modernStatLabel}>Thành phố</Text>
+          </View>
+        </View>
       </View>
 
       {/* Plan Badge */}
@@ -235,7 +310,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           <Text style={[styles.tabText, activeTab === 'diaries' && styles.activeTabText]}>{t('profile.diaries')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('itineraries')} style={[styles.tabBtn, activeTab === 'itineraries' && styles.activeTabBtn]}>
-          <Text style={[styles.tabText, activeTab === 'itineraries' && styles.activeTabText]}>{t('profile.itineraries')}</Text>
+          <Text style={[styles.tabText, activeTab === 'itineraries' && styles.activeTabText]}>Đã lưu</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('stats')} style={[styles.tabBtn, activeTab === 'stats' && styles.activeTabBtn]}>
           <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>{t('profile.stats')}</Text>
@@ -303,52 +378,134 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         )}
 
         {activeTab === 'itineraries' && (
-          <View style={{ marginTop: spacing.xl }}>
-            <EmptyState
-              icon="map-outline"
-              title="Chưa có lịch trình đã lưu"
-              message="Những lịch trình bạn lưu sẽ hiển thị ở đây."
-            />
+          <View style={{ marginTop: spacing.xl, paddingHorizontal: spacing.base }}>
+            {savedItineraries.length > 0 ? (
+              savedItineraries.map((it) => (
+                <TouchableOpacity 
+                  key={it.id} 
+                  style={styles.itineraryCardModern} 
+                  activeOpacity={0.9}
+                  onPress={() => setSelectedItinerary(it)}
+                >
+                  <View style={styles.itineraryHero}>
+                    <Image 
+                      source={it.destinationImage || 'https://images.unsplash.com/photo-1599514605917-76b91c95973e'} 
+                      style={styles.itineraryImage} 
+                      contentFit="cover" 
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.8)']}
+                      style={styles.itineraryGradient}
+                    />
+                    
+                    <View style={styles.durationBadge}>
+                      <Text style={styles.durationBadgeText}>{it.duration}</Text>
+                    </View>
+
+                    <View style={styles.itineraryHeroContent}>
+                      <Text style={styles.itineraryHeroTitle} numberOfLines={1}>
+                        {it.destination}
+                      </Text>
+                      <View style={styles.itineraryHeroMeta}>
+                        <View style={styles.heroMetaItem}>
+                          <Ionicons name="people" size={12} color="#fff" />
+                          <Text style={styles.heroMetaText}>{it.groupSize}</Text>
+                        </View>
+                        <View style={styles.heroMetaItem}>
+                          <Ionicons name="wallet" size={12} color="#fff" />
+                          <Text style={styles.heroMetaText}>{it.budget}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.itineraryFooter}>
+                    <Text style={styles.itineraryDateText}>
+                      Đã lưu {it.savedAt || new Date(it.createdAt).toLocaleDateString('vi-VN')}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.itineraryDeleteBtn}
+                      onPress={() => handleDeleteItinerary(it.id)}
+                    >
+                      <Ionicons name="trash" size={16} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <EmptyState
+                icon="map-outline"
+                title="Chưa có lịch trình đã lưu"
+                message="Những lịch trình bạn lưu sẽ hiển thị ở đây."
+              />
+            )}
           </View>
         )}
 
         {activeTab === 'stats' && (
-          <View style={styles.statsCard}>
-            <Text style={styles.statsCardTitle}>Hoạt Động Gần Đây</Text>
-            
-            <View style={styles.statRow}>
-              <View style={styles.statRowLeft}>
-                <View style={[styles.statIconBox, { backgroundColor: '#ffe4e6' }]}>
-                  <Ionicons name="heart" size={18} color="#e11d48"/>
-                </View>
-                <Text style={styles.statRowLabel}>Tổng lượt thích</Text>
+          <View style={styles.statsTabContainer}>
+            {/* Travel Stats */}
+            <View style={styles.statsCard2}>
+              <View style={styles.statsCardHeader}>
+                <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.statsCardIconBg}>
+                  <Ionicons name="map" size={24} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.statsCardTitle2}>Thống kê du lịch</Text>
               </View>
-              <Text style={styles.statRowValue}>{user.likes_received || 0}</Text>
-            </View>
-            
-            <View style={styles.statRow}>
-              <View style={styles.statRowLeft}>
-                <View style={[styles.statIconBox, { backgroundColor: '#e0e7ff' }]}>
-                  <Ionicons name="chatbubble" size={18} color="#4f46e5"/>
+              <View style={styles.statsList}>
+                <View style={styles.statsListItem}>
+                  <Text style={styles.statsListLabel}>Tổng số nhật ký</Text>
+                  <Text style={styles.statsListValue}>{user.diaries_count || 0}</Text>
                 </View>
-                <Text style={styles.statRowLabel}>Bình luận</Text>
-              </View>
-              <Text style={styles.statRowValue}>{user.comments_received || 0}</Text>
-            </View>
-            
-            <View style={styles.statRow}>
-              <View style={styles.statRowLeft}>
-                <View style={[styles.statIconBox, { backgroundColor: '#dcfce7' }]}>
-                  <Ionicons name="bookmark" size={18} color="#16a34a"/>
+                <View style={styles.statsListItem}>
+                  <Text style={styles.statsListLabel}>Quốc gia đã đến</Text>
+                  <Text style={styles.statsListValue}>{user.countries_visited || 0}</Text>
                 </View>
-                <Text style={styles.statRowLabel}>Lượt lưu</Text>
+                <View style={styles.statsListItem}>
+                  <Text style={styles.statsListLabel}>Thành phố đã đến</Text>
+                  <Text style={styles.statsListValue}>{user.cities_visited || 0}</Text>
+                </View>
               </View>
-              <Text style={styles.statRowValue}>{user.saves_received || 0}</Text>
             </View>
+
+            {/* Social Stats */}
+            <View style={styles.statsCard2}>
+              <View style={styles.statsCardHeader}>
+                <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.statsCardIconBg}>
+                  <Ionicons name="trophy" size={24} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.statsCardTitle2}>Thống kê cộng đồng</Text>
+              </View>
+              <View style={styles.statsList}>
+                <View style={styles.statsListItem}>
+                  <Text style={styles.statsListLabel}>Người theo dõi</Text>
+                  <Text style={styles.statsListValue}>{user.followers_count || 0}</Text>
+                </View>
+                <View style={styles.statsListItem}>
+                  <Text style={styles.statsListLabel}>Đang theo dõi</Text>
+                  <Text style={styles.statsListValue}>{user.following_count || 0}</Text>
+                </View>
+                <View style={styles.statsListItem}>
+                  <Text style={styles.statsListLabel}>Tỷ lệ tương tác</Text>
+                  <Text style={styles.statsListValue}>{calculatedEngagementRate}%</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Vietnam Map */}
+            <VietnamMap visitedProvinces={visitedLocations} />
           </View>
         )}
       </View>
       </ScrollView>
+
+      {/* Itinerary Detail Modal */}
+      <ItineraryDetailModal 
+        itinerary={selectedItinerary}
+        visible={!!selectedItinerary}
+        onClose={() => setSelectedItinerary(null)}
+        onDelete={(id) => handleDeleteItinerary(id)}
+      />
 
       {/* Fullscreen Image Viewer */}
       <Modal visible={!!viewImage} transparent={true} animationType="fade" onRequestClose={() => setViewImage(null)}>
@@ -536,7 +693,173 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     position: 'absolute',
     top: 40,
     right: 20,
-    zIndex: 10,
-    padding: 10,
+    zIndex: 1,
+  },
+  // Modern Stats Grid
+  modernStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.base,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    justifyContent: 'space-between',
+  },
+  modernStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    width: '46%',
+  },
+  modernStatIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernStatValue: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
+    color: colors.text,
+  },
+  modernStatLabel: {
+    fontSize: typography.xs,
+    color: colors.textSecondary,
+  },
+  // Modern Stats Tab
+  statsTabContainer: {
+    padding: spacing.base,
+    gap: spacing.lg,
+  },
+  statsCard2: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  statsCardIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsCardTitle2: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
+    color: colors.text,
+  },
+  statsList: {
+    gap: spacing.base,
+  },
+  statsListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? colors.border : '#f9fafb',
+    padding: spacing.base,
+    borderRadius: borderRadius.lg,
+  },
+  statsListLabel: {
+    fontSize: typography.base,
+    color: colors.textSecondary,
+  },
+  statsListValue: {
+    fontSize: typography.xl,
+    fontWeight: typography.bold,
+    color: '#ff3131',
+  },
+  itineraryCardModern: {
+    backgroundColor: colors.card,
+    borderRadius: 24,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  itineraryHero: {
+    height: 160,
+    position: 'relative',
+  },
+  itineraryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  itineraryGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  durationBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  durationBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#ff3131',
+  },
+  itineraryHeroContent: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
+  itineraryHeroTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  itineraryHeroMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  heroMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  heroMetaText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  itineraryFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.card,
+  },
+  itineraryDateText: {
+    fontSize: 12,
+    color: colors.textTertiary,
+  },
+  itineraryDeleteBtn: {
+    padding: 8,
+    backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+    borderRadius: 12,
   },
 });

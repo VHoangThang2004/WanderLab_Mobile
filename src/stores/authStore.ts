@@ -48,6 +48,11 @@ function buildUser(
     diaries_count: (profile?.diaries_count as number) || 0,
     followers_count: (profile?.followers_count as number) || 0,
     following_count: (profile?.following_count as number) || 0,
+    likes_received: (profile?.likes_received as number) || 0,
+    comments_received: (profile?.comments_received as number) || 0,
+    saves_received: (profile?.saves_received as number) || 0,
+    countries_visited: (profile?.countries_visited as number) || 0,
+    cities_visited: (profile?.cities_visited as number) || 0,
     created_at: authUser.created_at,
     updated_at: (profile?.updated_at as string) || authUser.created_at,
   };
