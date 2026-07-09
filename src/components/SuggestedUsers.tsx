@@ -88,7 +88,7 @@ export function SuggestedUsers() {
               />
               <Text style={styles.name} numberOfLines={1}>{profile.full_name}</Text>
               <Text style={styles.followers} numberOfLines={1}>
-                {profile.followers_count || 0} {t('feed.followers') || 'người theo dõi'}
+                {profile.followers_count || 0} {t('feed.followers') || 'bạn bè'}
               </Text>
 
               <TouchableOpacity 
@@ -97,7 +97,7 @@ export function SuggestedUsers() {
                 disabled={isFollowing}
               >
                 <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                  {isFollowing ? (t('feed.following') || 'Đang theo dõi') : (t('feed.follow') || 'Theo dõi')}
+                  {isFollowing ? (t('feed.following') || 'Bạn bè') : (t('feed.follow') || 'Kết bạn')}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -149,7 +149,7 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
           <View>
             <Text style={styles.authorName}>{diary.author.name}</Text>
             <Text style={styles.authorStats}>
-              {diary.author.diariesCount} nhật ký · {diary.author.followersCount} người theo dõi
+              {diary.author.diariesCount} nhật ký · {diary.author.followersCount} bạn bè
             </Text>
           </View>
         </View>
@@ -161,7 +161,7 @@ export function DiaryDetailScreen({ route, navigation }: DiaryDetailScreenProps)
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             >
               <Text style={[styles.followText, isFollowing && { color: colors.textSecondary }]}>
-                {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
+                {isFollowing ? 'Bạn bè' : 'Kết bạn'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

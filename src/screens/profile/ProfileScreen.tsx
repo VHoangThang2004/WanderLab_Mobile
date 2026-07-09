@@ -485,11 +485,11 @@ export function ProfileScreen({ navigation, route }: ProfileScreenProps) {
               </View>
               <View style={styles.statsList}>
                 <View style={styles.statsListItem}>
-                  <Text style={styles.statsListLabel}>Người theo dõi</Text>
+                  <Text style={styles.statsListLabel}>Bạn bè</Text>
                   <Text style={styles.statsListValue}>{user.followers_count || 0}</Text>
                 </View>
                 <View style={styles.statsListItem}>
-                  <Text style={styles.statsListLabel}>Đang theo dõi</Text>
+                  <Text style={styles.statsListLabel}>Đã gửi yêu cầu</Text>
                   <Text style={styles.statsListValue}>{user.following_count || 0}</Text>
                 </View>
                 <View style={styles.statsListItem}>

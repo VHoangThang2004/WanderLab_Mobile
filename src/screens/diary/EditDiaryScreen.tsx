@@ -588,7 +588,7 @@ export function EditDiaryScreen() {
                   </View>
                   <View style={{flex: 1}}>
                     <Text style={styles.privacyTitle}>Bạn bè</Text>
-                    <Text style={styles.privacyDesc}>Chỉ những người theo dõi bạn mới có thể xem</Text>
+                    <Text style={styles.privacyDesc}>Chỉ bạn bè mới có thể xem</Text>
                   </View>
                 </TouchableOpacity>
 

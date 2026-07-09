@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Alert, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,7 +31,7 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Mock Groups for now
-  const [groups] = useState([
+  const [groups, setGroups] = useState([
     {
       id: '1',
       full_name: 'Phượt Miền Bắc',
@@ -45,6 +45,28 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
       location: '1520 thành viên',
     }
   ]);
+
+  const [createGroupModalVisible, setCreateGroupModalVisible] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDesc, setNewGroupDesc] = useState('');
+
+  const handleCreateGroup = () => {
+    if (!newGroupName.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên nhóm');
+      return;
+    }
+    const newGroup = {
+      id: `group_${Date.now()}`,
+      full_name: newGroupName,
+      avatar_url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=200',
+      location: '1 thành viên',
+    };
+    setGroups(prev => [newGroup, ...prev]);
+    setCreateGroupModalVisible(false);
+    setNewGroupName('');
+    setNewGroupDesc('');
+    Alert.alert('Thành công', `Đã tạo nhóm "${newGroupName}"!`);
+  };
 
   useEffect(() => {
     fetchData();
@@ -172,7 +194,7 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
           {item.location && <Text style={styles.userLocation}>{item.location}</Text>}
           {(item.diaries_count !== undefined || item.followers_count !== undefined) && (
             <Text style={styles.userStats}>
-              {item.diaries_count || 0} bài viết · {item.followers_count || 0} người theo dõi
+              {item.diaries_count || 0} bài viết · {item.followers_count || 0} bạn bè
             </Text>
           )}
         </View>
@@ -247,6 +269,19 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
   return (
     <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Bạn Bè & Nhóm</Text>
+          {activeTab === 'groups' ? (
+            <TouchableOpacity onPress={() => setCreateGroupModalVisible(true)} style={styles.backBtn}>
+              <Ionicons name="add-circle" size={26} color={colors.primary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
+        </View>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
           <TextInput 
@@ -301,6 +336,36 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
           }
         />
       )}
+
+      {/* Create Group Modal */}
+      <Modal visible={createGroupModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Tạo Nhóm Mới</Text>
+              <TouchableOpacity onPress={() => setCreateGroupModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Tên nhóm..."
+              value={newGroupName}
+              onChangeText={setNewGroupName}
+            />
+            <TextInput
+              style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+              placeholder="Mô tả nhóm..."
+              value={newGroupDesc}
+              onChangeText={setNewGroupDesc}
+              multiline
+            />
+            <TouchableOpacity style={styles.submitBtn} onPress={handleCreateGroup}>
+              <Text style={styles.submitBtnText}>Tạo nhóm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -382,4 +447,12 @@ const styles = StyleSheet.create({
   
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyText: { marginTop: spacing.sm, fontSize: typography.base, color: colors.textSecondary },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 40 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  modalTitle: { fontSize: typography.xl, fontWeight: typography.bold, color: colors.text },
+  input: { backgroundColor: '#f1f5f9', borderRadius: borderRadius.md, padding: spacing.md, fontSize: typography.base, marginBottom: spacing.md },
+  submitBtn: { backgroundColor: colors.primary, borderRadius: borderRadius.full, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+  submitBtnText: { color: '#fff', fontSize: typography.base, fontWeight: typography.bold },
 });

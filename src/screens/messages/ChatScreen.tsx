@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard
+  TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,10 @@ import { UserAvatar } from '../../components/UserAvatar';
 import { messageService, ChatMessage } from '../../api/messageService';
 import { supabase } from '../../lib/supabase';
 import { colors, typography, spacing, borderRadius } from '../../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { Image } from 'expo-image';
 
 interface ChatScreenProps {
   route: any;
@@ -23,34 +28,31 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     fetchMessages();
     markMessagesAsRead();
 
-    // Subscribe to new messages using Supabase realtime
-    const subscription = supabase
-      .channel(`chat_${contactId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `or(and(sender_id.eq.${user?.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user?.id}))`
-        },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new as ChatMessage]);
-          if (payload.new.receiver_id === user?.id) {
-            markMessagesAsRead();
-          }
+    const channel = messageService.subscribeToMessages(user.id, (payload: any) => {
+      const msg = payload.new as ChatMessage;
+      if (!msg) return;
+      if (msg.sender_id === contactId || msg.receiver_id === contactId) {
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.find(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        if (msg.receiver_id === user.id) {
+          markMessagesAsRead();
         }
-      )
-      .subscribe();
+      }
+    });
 
     return () => {
-      subscription.unsubscribe();
+      if (channel) supabase.removeChannel(channel);
     };
   }, [contactId, user]);
 
@@ -106,6 +108,49 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
     }
   };
 
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0] && user) {
+        setIsUploading(true);
+        const asset = result.assets[0];
+        const media = await messageService.uploadChatMedia(asset.uri, asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+        if (media) {
+          await messageService.sendMessage(user.id, contactId, 'Đã gửi một tệp đính kèm', media.url, media.type);
+        }
+        setIsUploading(false);
+      }
+    } catch (e) {
+      console.warn(e);
+      setIsUploading(false);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0] && user) {
+        setIsUploading(true);
+        const asset = result.assets[0];
+        const media = await messageService.uploadChatMedia(asset.uri, asset.mimeType || 'application/octet-stream');
+        if (media) {
+          await messageService.sendMessage(user.id, contactId, 'Đã gửi một tệp', media.url, media.type);
+        }
+        setIsUploading(false);
+      }
+    } catch (e) {
+      console.warn(e);
+      setIsUploading(false);
+    }
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isMe = item.sender_id === user?.id;
     
@@ -114,10 +159,47 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
         {!isMe && (
           <UserAvatar src={contactAvatar} name={contactName} style={styles.messageAvatar} />
         )}
-        <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
-          <Text style={[styles.messageText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
-            {item.content}
-          </Text>
+        <View style={isMe ? styles.messageBubbleMeContainer : [styles.messageBubble, styles.messageBubbleOther]}>
+          {isMe ? (
+            <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.messageBubbleMe}>
+              {item.media_url && item.media_type === 'image' && (
+                <Image source={{ uri: item.media_url }} style={styles.messageMedia} contentFit="cover" />
+              )}
+              {item.media_url && item.media_type !== 'image' && (
+                <View style={styles.fileAttachmentContainer}>
+                  <Ionicons name="document-outline" size={24} color="#fff" />
+                  <Text style={styles.fileAttachmentText}>Tệp đính kèm</Text>
+                </View>
+              )}
+              <Text style={[styles.messageText, styles.messageTextMe]}>
+                {item.content}
+              </Text>
+              <View style={styles.messageStatusRow}>
+                <Text style={styles.messageTimeText}>
+                  {new Date(item.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                <Ionicons name={item.status === 'read' ? "checkmark-done" : "checkmark"} size={14} color="#rgba(255,255,255,0.7)" />
+              </View>
+            </LinearGradient>
+          ) : (
+            <View>
+              {item.media_url && item.media_type === 'image' && (
+                <Image source={{ uri: item.media_url }} style={styles.messageMedia} contentFit="cover" />
+              )}
+              {item.media_url && item.media_type !== 'image' && (
+                <View style={[styles.fileAttachmentContainer, { backgroundColor: '#e5e7eb' }]}>
+                  <Ionicons name="document-outline" size={24} color={colors.textSecondary} />
+                  <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>Tệp đính kèm</Text>
+                </View>
+              )}
+              <Text style={[styles.messageText, styles.messageTextOther]}>
+                {item.content}
+              </Text>
+              <Text style={styles.messageTimeTextOther}>
+                {new Date(item.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -135,13 +217,13 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerInfo}>
+        <TouchableOpacity style={styles.headerInfo} onPress={() => setShowInfoModal(true)}>
           <UserAvatar src={contactAvatar} name={contactName} style={styles.headerAvatar} />
           <View>
             <Text style={styles.headerName}>{contactName}</Text>
             <Text style={styles.headerStatus}>Đang hoạt động</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity 
             style={styles.actionButton}
@@ -155,7 +237,7 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
           >
             <Ionicons name="videocam-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setShowInfoModal(true)}>
             <Ionicons name="information-circle-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -181,8 +263,11 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
 
       {/* Input */}
       <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.attachButton}>
+        <TouchableOpacity style={styles.attachButton} onPress={handlePickImage} disabled={isUploading}>
           <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument} disabled={isUploading}>
+          <Ionicons name="attach-outline" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
         <TextInput
           style={styles.textInput}
@@ -206,6 +291,44 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
         </TouchableOpacity>
       </View>
       </KeyboardAvoidingView>
+
+      {/* Info Modal */}
+      <Modal
+        visible={showInfoModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowInfoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chi tiết liên hệ</Text>
+              <TouchableOpacity onPress={() => setShowInfoModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <UserAvatar src={contactAvatar} name={contactName} style={styles.modalAvatar} />
+              <Text style={styles.modalName}>{contactName}</Text>
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalActionBtn}>
+                  <Ionicons name="person-outline" size={24} color={colors.primary} />
+                  <Text style={styles.modalActionText}>Xem hồ sơ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalActionBtn}>
+                  <Ionicons name="search-outline" size={24} color={colors.primary} />
+                  <Text style={styles.modalActionText}>Tìm kiếm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalActionBtn}>
+                  <Ionicons name="notifications-off-outline" size={24} color={colors.textSecondary} />
+                  <Text style={styles.modalActionText}>Tắt thông báo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -285,9 +408,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: 20,
   },
-  messageBubbleMe: {
-    backgroundColor: colors.primary,
+  messageBubbleMeContainer: {
+    borderRadius: 20,
     borderBottomRightRadius: 4,
+    overflow: 'hidden',
+  },
+  messageBubbleMe: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   messageBubbleOther: {
     backgroundColor: '#f3f4f6',
@@ -302,6 +430,43 @@ const styles = StyleSheet.create({
   },
   messageTextOther: {
     color: colors.text,
+  },
+  messageStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+    gap: 4,
+  },
+  messageTimeText: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  messageTimeTextOther: {
+    fontSize: 10,
+    color: colors.textTertiary,
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  messageMedia: {
+    width: 200,
+    height: 150,
+    borderRadius: 12,
+    marginBottom: spacing.xs,
+  },
+  fileAttachmentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: spacing.sm,
+    borderRadius: 8,
+    marginBottom: spacing.xs,
+    gap: spacing.xs,
+  },
+  fileAttachmentText: {
+    color: '#fff',
+    fontSize: typography.sm,
+    fontWeight: typography.medium,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -340,5 +505,60 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.border,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.xl,
+    minHeight: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  modalTitle: {
+    fontSize: typography.xl,
+    fontWeight: typography.bold,
+    color: colors.text,
+  },
+  modalBody: {
+    alignItems: 'center',
+  },
+  modalAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: spacing.md,
+  },
+  modalName: {
+    fontSize: typography['2xl'],
+    fontWeight: typography.bold,
+    color: colors.text,
+    marginBottom: spacing.xl,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  modalActionBtn: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  modalActionText: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.medium,
   },
 });

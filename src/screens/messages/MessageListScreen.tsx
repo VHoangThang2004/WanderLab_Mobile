@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../stores/authStore';
 import { UserAvatar } from '../../components/UserAvatar';
 import { messageService, ChatContact } from '../../api/messageService';
@@ -64,9 +65,9 @@ export function MessageListScreen({ navigation }: MessageListScreenProps) {
             {item.lastMessage}
           </Text>
           {item.unread > 0 && (
-            <View style={styles.unreadBadge}>
+            <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.unreadBadge}>
               <Text style={styles.unreadText}>{item.unread}</Text>
-            </View>
+            </LinearGradient>
           )}
         </View>
       </View>
@@ -236,13 +237,12 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   unreadBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
   },
   unreadText: {
     color: '#fff',

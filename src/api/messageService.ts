@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 
 export interface ChatMessage {
   id: string;
@@ -131,12 +133,12 @@ export const messageService = {
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const arrayBuffer = decode(base64);
 
       const { error: uploadError } = await supabase.storage
         .from('chat_media')
-        .upload(filePath, blob, {
+        .upload(filePath, arrayBuffer, {
           contentType: type,
         });
 

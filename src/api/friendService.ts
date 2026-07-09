@@ -98,7 +98,7 @@ export const friendService = {
   async checkIsFollowing(followerId: string, followingId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('follows')
-      .select('id')
+      .select('follower_id')
       .eq('follower_id', followerId)
       .eq('following_id', followingId)
       .limit(1);
