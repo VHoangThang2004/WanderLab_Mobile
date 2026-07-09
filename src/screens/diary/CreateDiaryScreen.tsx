@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { diaryService } from '../../api/diaryService';
+import { aiService } from '../../api/aiService';
 import { CreateDiaryPayload } from '../../types/diary';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -51,6 +52,37 @@ export function CreateDiaryScreen() {
   const [budget, setBudget] = useState('');
   const [groupSize, setGroupSize] = useState('1');
   const [description, setDescription] = useState('');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  const handleGenerateDescription = async () => {
+    if (!location) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn địa điểm ở Bước 1 trước khi dùng AI.");
+      return;
+    }
+    
+    const allowed = await checkLimit('ai_assistant', true);
+    if (!allowed) return;
+
+    try {
+      setIsGeneratingAI(true);
+      const context = {
+        location: location,
+        budget: budget || 'chưa rõ',
+        groupSize: groupSize || 1,
+        style: style || 'tự do'
+      };
+      
+      const response = await aiService.polishDescription(description, context, "vi");
+      if (response) {
+        setDescription(response);
+        await incrementUsage('ai_assistant');
+      }
+    } catch (error) {
+      Alert.alert("Lỗi AI", "Không thể tạo mô tả lúc này. Vui lòng thử lại sau.");
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
 
   // Step 3: Timeline & Media
   const [timeline, setTimeline] = useState<any[]>([
@@ -409,8 +441,16 @@ export function CreateDiaryScreen() {
                       <Text style={styles.aiSuggestionTitle}>Gợi Ý AI</Text>
                     </View>
                     <Text style={styles.aiSuggestionText}>Dựa trên địa điểm và ngày tháng của bạn, AI có thể gợi ý viết mô tả chuyến đi một cách tự nhiên và sinh động hơn.</Text>
-                    <TouchableOpacity style={styles.aiBtn} onPress={() => Alert.alert("Thông báo", "Tính năng AI tự viết nhật ký đang được thử nghiệm.")}>
-                      <Text style={styles.aiBtnText}>Bật Trợ Lý AI →</Text>
+                    <TouchableOpacity 
+                      style={styles.aiBtn} 
+                      onPress={handleGenerateDescription}
+                      disabled={isGeneratingAI}
+                    >
+                      {isGeneratingAI ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={styles.aiBtnText}>Bật Trợ Lý AI →</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </View>

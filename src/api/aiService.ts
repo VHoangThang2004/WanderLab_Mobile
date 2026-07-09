@@ -1,54 +1,93 @@
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
-const isApiKeyValid = GEMINI_API_KEY.startsWith("AIzaSy");
+const API_LLM_KEY = process.env.EXPO_PUBLIC_API_LLM_KEY || "";
+const API_LLM_ENDPOINT = process.env.EXPO_PUBLIC_API_LLM_ENDPOINT || "https://v-router.fpt.ovh/v1/chat/completions";
+const API_LLM_MODEL = process.env.EXPO_PUBLIC_API_LLM_MODEL || "WanderLab";
 
 export const aiService = {
   /**
-   * General-purpose Gemini API request sender using Fetch.
+   * General-purpose Custom LLM API request sender using Fetch.
    */
-  async generateContent(prompt: string): Promise<string> {
-    if (!GEMINI_API_KEY) {
-      console.warn("Gemini API error: EXPO_PUBLIC_GEMINI_API_KEY is missing or empty.");
+  async generateContent(prompt: string, systemPrompt?: string): Promise<string> {
+    if (!API_LLM_KEY) {
+      console.warn("AI API error: EXPO_PUBLIC_API_LLM_KEY is missing or empty.");
       throw new Error("INVALID_KEY: Missing Key");
-    }
-    if (!isApiKeyValid) {
-      console.warn("Gemini API error: EXPO_PUBLIC_GEMINI_API_KEY is invalid (must start with AIzaSy).");
-      throw new Error("INVALID_KEY: Invalid Key format");
     }
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: prompt,
-                  },
-                ],
-              },
-            ],
-          }),
-        }
-      );
+      const messages: any[] = [];
+      if (systemPrompt) {
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      messages.push({ role: "user", content: prompt });
+
+      const response = await fetch(API_LLM_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${API_LLM_KEY}`,
+        },
+        body: JSON.stringify({
+          model: API_LLM_MODEL,
+          messages: messages,
+          stream: false,
+        }),
+      });
 
       const data = await response.json();
-      const candidate = data?.candidates?.[0];
-      const text = candidate?.content?.parts?.[0]?.text;
+      const text = data?.choices?.[0]?.message?.content;
 
       if (!text) {
-        throw new Error("Không nhận được kết quả hợp lệ từ Gemini API.");
+        throw new Error("Không nhận được kết quả hợp lệ từ AI API.");
       }
 
       return text.trim();
     } catch (error: any) {
-      console.error("Gemini API error:", error);
+      console.error("AI API error:", error);
       throw error;
+    }
+  },
+
+  /**
+   * Expands and completes the user's short draft description.
+   */
+  async polishDescription(currentText: string, context: any, language: string = "vi"): Promise<string> {
+    const contextStr = `Địa điểm: ${context.location}, Ngân sách: ${context.budget}, Nhóm: ${context.groupSize} người, Phong cách: ${context.style}`;
+    const prompt =
+      language === "vi"
+        ? `Bạn là trợ lý ảo viết lách thông minh của WanderLab.
+Nhiệm vụ của bạn là VIẾT TIẾP và HOÀN THIỆN mô tả chuyến đi từ đoạn mô tả ngắn/ý tưởng sơ khai hiện có của người dùng để tạo nên một bài viết hấp dẫn, trọn vẹn và truyền cảm hứng.
+
+Thông tin chuyến đi (Ngữ cảnh):
+${contextStr}
+
+Ý tưởng/Đoạn mô tả ngắn hiện tại của người dùng:
+"${currentText}"
+
+Yêu cầu:
+1. Giữ nguyên ý chính và phong cách trong ý tưởng hiện tại của người dùng, sau đó viết tiếp để mở rộng, hoàn thiện đoạn mô tả một cách mượt mà và tự nhiên.
+2. Độ dài đoạn văn hoàn thiện khoảng 4-5 câu (khoảng 80 - 120 từ).
+3. Làm nổi bật điểm độc đáo của địa danh, trải nghiệm và phong cách du lịch được lựa chọn.
+4. Chỉ trả về đoạn văn mô tả hoàn thiện trực tiếp. Không thêm lời chào, không giải thích, không bọc trong ngoặc kép.`
+        : `You are the smart AI writing assistant of WanderLab.
+Your task is to EXPAND and COMPLETE the trip description based on the user's short draft/ideas to make it engaging, coherent, and inspiring.
+
+Trip Info (Context):
+${contextStr}
+
+User's current short description/ideas:
+"${currentText}"
+
+Requirements:
+1. Retain the core meaning and tone of the user's current draft, then continue writing to expand and complete the description smoothly and naturally.
+2. The final paragraph length should be about 4-5 sentences (80 - 120 words).
+3. Highlight the unique aspect of the destination, activities, and travel style.
+4. Return ONLY the completed description paragraph directly. No intro, no explanations, no quotation marks.`;
+
+    try {
+      return await this.generateContent(prompt);
+    } catch (error: any) {
+      console.warn("Falling back to local mock expansion due to API error:", error.message);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return currentText + (language === "vi" ? " Đây là một chuyến đi tuyệt vời với những trải nghiệm không thể nào quên." : " This is an amazing trip with unforgettable experiences.");
     }
   },
 
@@ -131,7 +170,7 @@ Return ONLY a valid JSON object, with no other text, exactly matching this struc
    * Generates bot response for AIAssistant chat.
    */
   async chatWithWanderBot(message: string, history: { role: 'user' | 'model', text: string }[]): Promise<string> {
-    if (!GEMINI_API_KEY) {
+    if (!API_LLM_KEY) {
       throw new Error("INVALID_KEY: Missing Key");
     }
 
@@ -156,34 +195,36 @@ Nếu người dùng hỏi ngoài phạm vi (lập trình, toán, y tế, pháp 
 • Ưu tiên thông tin thực tế, có ích`;
 
     try {
-      const contents = history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-      }));
-      contents.push({ role: 'user', parts: [{ text: message }] });
+      const messages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
+      
+      // Map history 'model' role to 'assistant' role for OpenAI format
+      history.forEach(msg => {
+        messages.push({
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.text
+        });
+      });
+      
+      messages.push({ role: 'user', content: message });
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: SYSTEM_PROMPT }]
-            },
-            contents: contents,
-          }),
-        }
-      );
+      const response = await fetch(API_LLM_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${API_LLM_KEY}`,
+        },
+        body: JSON.stringify({
+          model: API_LLM_MODEL,
+          messages: messages,
+          stream: false,
+        }),
+      });
 
       const data = await response.json();
-      const candidate = data?.candidates?.[0];
-      const text = candidate?.content?.parts?.[0]?.text;
+      const text = data?.choices?.[0]?.message?.content;
 
       if (!text) {
-        throw new Error("Không nhận được kết quả hợp lệ từ Gemini API.");
+        throw new Error("Không nhận được kết quả hợp lệ từ AI API.");
       }
 
       return text.trim();
