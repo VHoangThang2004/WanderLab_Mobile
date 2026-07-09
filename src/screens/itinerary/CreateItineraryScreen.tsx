@@ -12,6 +12,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { Alert } from 'react-native';
 import { colors, gradients, typography, spacing, borderRadius } from '../../theme';
 import { aiService } from '../../api/aiService';
 import { useUsageLimits } from '../../hooks/useUsageLimits';
@@ -86,6 +89,66 @@ export function CreateItineraryScreen({ navigation }: any) {
       console.error(e);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!itineraryResult) return;
+    
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px; color: #333; }
+            h1 { color: #2563eb; font-size: 24px; margin-bottom: 5px; }
+            .meta { color: #666; margin-bottom: 20px; font-size: 14px; }
+            .day-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: #f9fafb; }
+            .day-title { font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #1f2937; }
+            .day-meta { font-size: 12px; color: #2563eb; font-weight: bold; margin-bottom: 10px; }
+            ul { margin: 0; padding-left: 20px; }
+            li { margin-bottom: 5px; font-size: 14px; line-height: 1.5; }
+            .budget-section { margin-top: 30px; border-top: 2px solid #e5e7eb; padding-top: 15px; }
+            .budget-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+            .budget-total { font-weight: bold; font-size: 16px; margin-top: 10px; color: #2563eb; display: flex; justify-content: space-between; }
+          </style>
+        </head>
+        <body>
+          <h1>${itineraryResult.title || selectedDest.name}</h1>
+          <div class="meta">⏱ ${duration} | 👥 ${groupSize} | 💰 ${budget}</div>
+          
+          ${itineraryResult.days.map((day: any) => `
+            <div class="day-card">
+              <div class="day-meta">NGÀY ${day.day} &bull; ~${day.budget}</div>
+              <div class="day-title">${day.title}</div>
+              <ul>
+                ${day.activities.map((act: string) => `<li>${act}</li>`).join('')}
+              </ul>
+            </div>
+          `).join('')}
+          
+          <div class="budget-section">
+            <h2 style="font-size: 18px; margin-bottom: 15px;">Ước tính chi phí</h2>
+            ${itineraryResult.budgetBreakdown?.map((cost: any) => `
+              <div class="budget-row">
+                <span>${cost.label}</span>
+                <strong>${cost.amount}</strong>
+              </div>
+            `).join('')}
+            <div class="budget-total">
+              <span>Tổng cộng:</span>
+              <span>${itineraryResult.totalBudget}</span>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể tạo file PDF');
     }
   };
 
@@ -283,11 +346,15 @@ export function CreateItineraryScreen({ navigation }: any) {
                 <Ionicons name="refresh" size={20} color={colors.text} />
                 <Text style={styles.actionBtnTextOutline}>Làm lại</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtnOutline} onPress={handleExportPDF}>
+                <Ionicons name="document-text" size={20} color={colors.text} />
+                <Text style={styles.actionBtnTextOutline}>Xuất PDF</Text>
+              </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.actionBtnSolid, isSaved && { backgroundColor: '#10b981' }]} 
                 onPress={() => {
                   setIsSaved(true);
-                  setTimeout(() => navigation.goBack(), 1000);
+                  setTimeout(() => navigation.navigate('MainTabs'), 1000);
                 }}
               >
                 <Ionicons name={isSaved ? "checkmark" : "bookmark"} size={20} color="#fff" />
@@ -325,8 +392,8 @@ const styles = StyleSheet.create({
   stepTitle: { fontSize: typography.lg, fontWeight: typography.bold, color: colors.text, marginBottom: spacing.xs },
   
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  destCard: { width: (width - 32 - spacing.sm) / 2, height: 120, borderRadius: borderRadius.lg, overflow: 'hidden', position: 'relative' },
-  destCardActive: { borderWidth: 2, borderColor: colors.primary },
+  destCard: { width: (width - 32 - spacing.sm) / 2, height: 120, borderRadius: borderRadius.lg, overflow: 'hidden', position: 'relative', borderWidth: 2, borderColor: 'transparent' },
+  destCardActive: { borderColor: colors.primary },
   destImage: { width: '100%', height: '100%' },
   destOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
   checkIcon: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
