@@ -11,7 +11,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DiaryPostCard } from '../../components/DiaryPostCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
-import { SuggestedUsers } from '../../components/SuggestedUsers';
 import { UserAvatar } from '../../components/UserAvatar';
 import { diaryService } from '../../api/diaryService';
 import { interactionService } from '../../api/interactionService';
@@ -59,11 +58,6 @@ export function FeedScreen({ navigation }: FeedScreenProps) {
 
   const renderHeader = () => (
     <View>
-
-
-
-      <SuggestedUsers />
-
       {/* Feed Title */}
       <View style={styles.feedHeader}>
         <View style={styles.feedHeaderIcon}>
