@@ -1,3 +1,6 @@
+import { usageLimitService } from './usageLimitService';
+import { useAuthStore } from '../stores/authStore';
+
 const API_LLM_KEY = process.env.EXPO_PUBLIC_API_LLM_KEY || "";
 const API_LLM_ENDPOINT = process.env.EXPO_PUBLIC_API_LLM_ENDPOINT || "https://v-router.fpt.ovh/v1/chat/completions";
 const API_LLM_MODEL = process.env.EXPO_PUBLIC_API_LLM_MODEL || "WanderLab";
@@ -92,9 +95,44 @@ Requirements:
   },
 
   /**
+   * Generates a diary entry based on keywords.
+   */
+  async generateDiaryContent(keywords: string, tone: string = "kể chuyện, tự nhiên"): Promise<{ title: string, content: string }> {
+    const user = useAuthStore.getState().user;
+    if (user) {
+      const plan = user.plan || 'free';
+      const canUse = await usageLimitService.canUseAI(user.id, plan, 'diary');
+      if (!canUse) {
+        throw new Error(`LIMIT_EXCEEDED: Bạn đã đạt giới hạn sử dụng Trợ lý AI viết nhật ký trong ngày của gói ${plan.toUpperCase()}.`);
+      }
+      usageLimitService.incrementAIUsage(user.id, 'diary');
+    }
+
+    const systemPrompt = "Bạn là một trợ lý ảo chuyên viết nhật ký du lịch chuyên nghiệp, hấp dẫn và tự nhiên. Bạn chỉ trả về nội dung theo ĐÚNG định dạng JSON yêu cầu. Định dạng JSON: {\"title\": \"Tiêu đề bài viết\", \"content\": \"Nội dung bài viết\"}. Nội dung bài viết có thể có nhiều đoạn, tự động xuống dòng và sử dụng các biểu tượng cảm xúc (emoji) phù hợp.";
+    const prompt = `Hãy viết một bài nhật ký du lịch dựa trên các từ khóa sau: "${keywords}".
+Giọng điệu: ${tone}.
+Lưu ý: TRẢ VỀ CHÍNH XÁC CHUỖI JSON ĐƯỢC ĐỊNH DẠNG HỢP LỆ, KHÔNG BAO GỒM \`\`\`json HOẶC BẤT KỲ VĂN BẢN NÀO KHÁC BÊN NGOÀI.`;
+
+    const response = await this.generateContent(prompt, systemPrompt);
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? jsonMatch[0] : response;
+    return JSON.parse(jsonString);
+  },
+
+  /**
    * Generates a full itinerary (JSON array) based on the user's selected context.
    */
   async generateItinerary(context: any, language: string = "vi"): Promise<any> {
+    const user = useAuthStore.getState().user;
+    if (user) {
+      const plan = user.plan || 'free';
+      const canUse = await usageLimitService.canUseAI(user.id, plan, 'schedule');
+      if (!canUse) {
+        throw new Error(`LIMIT_EXCEEDED: Bạn đã đạt giới hạn sử dụng Trợ lý AI tạo lịch trình trong ngày của gói ${plan.toUpperCase()}.`);
+      }
+      usageLimitService.incrementAIUsage(user.id, 'schedule');
+    }
+
     const { destination, duration, budget, groupSize, interests } = context;
     const days = parseInt(duration) || 3;
     

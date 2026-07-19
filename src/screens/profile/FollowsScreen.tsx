@@ -30,46 +30,39 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Mock Groups for now
-  const [groups, setGroups] = useState([
-    {
-      id: '1',
-      full_name: 'Phượt Miền Bắc',
-      avatar_url: 'https://images.unsplash.com/photo-1694152362587-99d77d21793b?w=200',
-      location: '248 thành viên',
-    },
-    {
-      id: '2',
-      full_name: 'Du Lịch Bụi Việt Nam',
-      avatar_url: 'https://images.unsplash.com/photo-1547024842-7c86b2226ef5?w=200',
-      location: '1520 thành viên',
-    }
-  ]);
+  const [groups, setGroups] = useState<any[]>([]);
 
   const [createGroupModalVisible, setCreateGroupModalVisible] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (!newGroupName.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập tên nhóm');
       return;
     }
-    const newGroup = {
-      id: `group_${Date.now()}`,
-      full_name: newGroupName,
-      avatar_url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=200',
-      location: '1 thành viên',
-    };
-    setGroups(prev => [newGroup, ...prev]);
-    setCreateGroupModalVisible(false);
-    setNewGroupName('');
-    setNewGroupDesc('');
-    Alert.alert('Thành công', `Đã tạo nhóm "${newGroupName}"!`);
+    if (!user) return;
+    setLoading(true);
+    try {
+      await friendService.createGroup(user.id, newGroupName.trim(), newGroupDesc.trim());
+      Alert.alert('Thành công', `Đã tạo nhóm "${newGroupName}"!`);
+      setCreateGroupModalVisible(false);
+      setNewGroupName('');
+      setNewGroupDesc('');
+      fetchGroups();
+    } catch (e: any) {
+      // Bắt lỗi nếu bảng chưa tồn tại
+      console.warn(e);
+      Alert.alert('Chưa khả dụng', 'Tính năng nhóm đang được hoàn thiện trên máy chủ.');
+      setCreateGroupModalVisible(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchData();
+    fetchGroups();
   }, [user]);
 
   useEffect(() => {
@@ -91,6 +84,23 @@ export function FollowsScreen({ route, navigation }: FollowsScreenProps) {
       console.warn("Failed to fetch follows:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchGroups = async () => {
+    if (!user) return;
+    try {
+      const result = await friendService.fetchUserGroups(user.id);
+      // Map về format UI
+      const mapped = result.map((g: any) => ({
+        id: g.id,
+        full_name: g.name,
+        avatar_url: g.avatar_url,
+        location: g.description,
+      }));
+      setGroups(mapped);
+    } catch (e) {
+      console.warn("Failed to fetch groups:", e);
     }
   };
 

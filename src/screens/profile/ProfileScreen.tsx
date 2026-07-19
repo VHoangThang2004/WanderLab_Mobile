@@ -297,7 +297,11 @@ export function ProfileScreen({ navigation, route }: ProfileScreenProps) {
       </View>
 
       {/* Plan Badge */}
-      <View style={styles.planContainer}>
+      <TouchableOpacity 
+        style={styles.planContainer}
+        onPress={() => navigation.navigate('Subscription')}
+        activeOpacity={0.8}
+      >
         <LinearGradient
           colors={user.plan === 'free' ? ['#e5e7eb', '#d1d5db'] : gradients.primary}
           style={styles.planBadge}
@@ -308,8 +312,9 @@ export function ProfileScreen({ navigation, route }: ProfileScreenProps) {
           <Text style={[styles.planText, user.plan === 'free' && { color: '#6b7280' }]}>
             {user.plan === 'free' ? 'Free Plan' : user.plan === 'starter' ? 'Starter Plan' : 'Professional Plan'}
           </Text>
+          <Ionicons name="chevron-forward" size={14} color={user.plan === 'free' ? '#6b7280' : '#fff'} style={{ marginLeft: 4 }} />
         </LinearGradient>
-      </View>
+      </TouchableOpacity>
 
       {/* Tabs */}
       <View style={styles.tabContainer}>

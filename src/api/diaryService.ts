@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { DiaryFeedItem, DiaryExploreItem, DiaryDetail, CreateDiaryPayload } from '../types/diary';
+import { usageLimitService } from './usageLimitService';
+import { useAuthStore } from '../stores/authStore';
 
 export const diaryService = {
   async fetchFeedDiaries(): Promise<DiaryFeedItem[]> {
@@ -238,14 +240,22 @@ export const diaryService = {
    * Tạo nhật ký mới vào DB
    */
   async createDiary(payload: CreateDiaryPayload, coverImageUrl: string): Promise<string> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('User not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const currentUser = useAuthStore.getState().user;
+    if (currentUser) {
+      const canCreate = await usageLimitService.canCreateDiary(user.id, currentUser.plan);
+      if (!canCreate) {
+        throw new Error(`LIMIT_EXCEEDED: Bạn đã đạt giới hạn tạo nhật ký trong ngày của gói ${currentUser.plan.toUpperCase()}. Vui lòng nâng cấp gói để tiếp tục.`);
+      }
+    }
 
     // 1. Insert diary record
     const { data: diary, error: diaryError } = await supabase
       .from('diaries')
       .insert({
-        user_id: userData.user.id,
+        user_id: user.id,
         title: payload.title,
         location: payload.location,
         country: payload.country,

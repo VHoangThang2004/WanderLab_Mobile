@@ -248,5 +248,63 @@ export const friendService = {
     }
 
     return profiles || [];
+  },
+
+  /**
+   * Fetch groups for a user
+   */
+  async fetchUserGroups(userId: string) {
+    if (!userId) return [];
+    
+    // Giả sử có bảng group_members và groups
+    const { data, error } = await supabase
+      .from('group_members')
+      .select(`
+        group_id,
+        group:groups (
+          id,
+          name,
+          avatar_url,
+          description
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.warn("Error fetching groups (might not exist yet):", error);
+      return [];
+    }
+    
+    return (data || []).map(item => item.group).filter(Boolean);
+  },
+
+  /**
+   * Create a new group
+   */
+  async createGroup(userId: string, name: string, description: string) {
+    const { data: newGroup, error: groupError } = await supabase
+      .from('groups')
+      .insert({
+        name,
+        description,
+        creator_id: userId
+      })
+      .select()
+      .single();
+
+    if (groupError) {
+      throw groupError;
+    }
+
+    // Add creator to group_members
+    if (newGroup) {
+      await supabase.from('group_members').insert({
+        group_id: newGroup.id,
+        user_id: userId,
+        role: 'admin'
+      });
+    }
+
+    return newGroup;
   }
 };

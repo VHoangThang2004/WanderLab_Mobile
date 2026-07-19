@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,12 +12,14 @@ import { useAuthStore } from '../../stores/authStore';
 import { colors, typography, spacing, borderRadius } from '../../theme';
 import { supabase } from '../../lib/supabase';
 import { decode } from 'base64-arraybuffer';
+import { useUsageLimits } from '../../hooks/useUsageLimits';
 
 export function CreateDiaryBookScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
+  const { checkLimit, incrementUsage } = useUsageLimits();
 
   const { bookId } = route.params || {};
   const isEditing = !!bookId;
@@ -110,24 +112,34 @@ export function CreateDiaryBookScreen() {
         }, selectedDiaries);
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      if (!isEditing) {
+        await incrementUsage('create_itinerary');
+      }
       queryClient.invalidateQueries({ queryKey: ['diaryBooks'] });
       if (isEditing) {
         queryClient.invalidateQueries({ queryKey: ['diaryBook', bookId] });
       }
       navigation.goBack();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error saving book:', error);
-      alert('Đã xảy ra lỗi khi lưu cuốn sách.');
+      const msg = error?.message || 'Đã xảy ra lỗi khi lưu cuốn sách.';
+      Alert.alert('Thông báo', msg);
     },
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) {
-      alert('Vui lòng nhập tiêu đề cho cuốn sách.');
+      Alert.alert('Thông báo', 'Vui lòng nhập tiêu đề cho cuốn sách.');
       return;
     }
+    
+    if (!isEditing) {
+      const allowed = await checkLimit('create_itinerary', true);
+      if (!allowed) return;
+    }
+
     createBookMutation.mutate();
   };
 

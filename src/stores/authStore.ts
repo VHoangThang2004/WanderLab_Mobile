@@ -22,6 +22,7 @@ interface AuthState {
     location?: string | null;
     avatar_url?: string | null;
     cover_image_url?: string | null;
+    plan?: string;
   }) => Promise<void>;
   subscribeToProfileUpdates: () => void;
   unsubscribeFromProfileUpdates: () => void;

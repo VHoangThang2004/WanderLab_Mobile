@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -12,9 +12,38 @@ export function CallScreen({ route, navigation }: any) {
   const { contactName, contactAvatar, isVideo = false } = route.params || {};
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(!isVideo);
+  const [callStatus, setCallStatus] = useState('Đang đổ chuông...');
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    // Simulate answering after 3 seconds
+    const timer = setTimeout(() => {
+      setCallStatus('Đã kết nối');
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (callStatus === 'Đã kết nối') {
+      interval = setInterval(() => {
+        setDuration(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    }
+  }, [callStatus]);
 
   const handleEndCall = () => {
     navigation.goBack();
+  };
+
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -24,7 +53,7 @@ export function CallScreen({ route, navigation }: any) {
       <SafeAreaView style={styles.safeArea}>
         {/* Caller Info */}
         <View style={styles.callerInfo}>
-          {!isVideoOff ? (
+          {!isVideoOff && callStatus === 'Đã kết nối' ? (
             <View style={styles.videoPlaceholder}>
               <Ionicons name="videocam-outline" size={48} color="rgba(255,255,255,0.5)" />
               <Text style={styles.videoText}>Camera đang bật</Text>
@@ -33,7 +62,9 @@ export function CallScreen({ route, navigation }: any) {
             <Image source={{ uri: contactAvatar || 'https://via.placeholder.com/150' }} style={styles.avatar} contentFit="cover" />
           )}
           <Text style={styles.name}>{contactName || 'Người dùng'}</Text>
-          <Text style={styles.status}>Đang gọi...</Text>
+          <Text style={styles.status}>
+            {callStatus === 'Đã kết nối' ? formatDuration(duration) : callStatus}
+          </Text>
         </View>
 
         {/* Controls */}

@@ -267,11 +267,12 @@ function AuthNavigator() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates } = useAuthStore();
+  const { isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates, refreshSession } = useAuthStore();
   const { isDarkMode, colors } = useTheme();
 
   useEffect(() => {
     if (isAuthenticated) {
+      refreshSession();
       subscribeToProfileUpdates();
     } else {
       unsubscribeFromProfileUpdates();
@@ -279,7 +280,7 @@ export function AppNavigator() {
     return () => {
       unsubscribeFromProfileUpdates();
     };
-  }, [isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates]);
+  }, [isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates, refreshSession]);
 
   const navigationTheme = isDarkMode ? DarkTheme : DefaultTheme;
   const customTheme = {

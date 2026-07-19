@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { DiaryBook, CreateDiaryBookPayload } from '../types/diaryBook';
+import { usageLimitService } from './usageLimitService';
+import { useAuthStore } from '../stores/authStore';
 
 export const diaryBookService = {
   /**
@@ -125,14 +127,22 @@ export const diaryBookService = {
    * Tạo cuốn nhật ký mới
    */
   async createBook(payload: CreateDiaryBookPayload, diaryIds: string[]): Promise<string> {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) throw new Error('User not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const currentUser = useAuthStore.getState().user;
+    if (currentUser) {
+      const canCreate = await usageLimitService.canCreateSchedule(user.id, currentUser.plan);
+      if (!canCreate) {
+        throw new Error(`LIMIT_EXCEEDED: Bạn đã đạt giới hạn tạo lịch trình trong ngày của gói ${currentUser.plan.toUpperCase()}. Vui lòng nâng cấp gói để tiếp tục.`);
+      }
+    }
 
     // 1. Create book
     const { data: book, error: bookError } = await supabase
       .from('diary_books')
       .insert({
-        user_id: userData.user.id,
+        user_id: user.id,
         title: payload.title,
         description: payload.description,
         cover_image_url: payload.cover_image_url || null,

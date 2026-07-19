@@ -232,5 +232,37 @@ export const messageService = {
       });
 
     return channel;
+  },
+
+  /**
+   * Delete a message (or mark it as deleted/recalled)
+   */
+  async deleteMessage(messageId: string, userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: 'Tin nhắn đã được thu hồi', media_url: null, media_type: null })
+      .eq('id', messageId)
+      .eq('sender_id', userId);
+
+    if (error) {
+      console.error("Error deleting message:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update a message content
+   */
+  async updateMessage(messageId: string, userId: string, newContent: string): Promise<void> {
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: newContent })
+      .eq('id', messageId)
+      .eq('sender_id', userId);
+
+    if (error) {
+      console.error("Error updating message:", error);
+      throw error;
+    }
   }
 };

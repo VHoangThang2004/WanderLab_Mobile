@@ -60,7 +60,7 @@ export function CreateDiaryScreen() {
       return;
     }
     
-    const allowed = await checkLimit('ai_assistant', true);
+    const allowed = await checkLimit('ai_diary', true);
     if (!allowed) return;
 
     try {
@@ -75,7 +75,7 @@ export function CreateDiaryScreen() {
       const response = await aiService.polishDescription(description, context, "vi");
       if (response) {
         setDescription(response);
-        await incrementUsage('ai_assistant');
+        await incrementUsage('ai_diary');
       }
     } catch (error) {
       Alert.alert("Lỗi AI", "Không thể tạo mô tả lúc này. Vui lòng thử lại sau.");

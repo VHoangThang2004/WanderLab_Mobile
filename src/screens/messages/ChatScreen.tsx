@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
+import Constants from 'expo-constants';
+import { Audio } from 'expo-av';
 
 interface ChatScreenProps {
   route: any;
@@ -31,8 +33,21 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Recording state
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // CRUD state
+  const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [showContextMenu, setShowContextMenu] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
+    
     fetchMessages();
     markMessagesAsRead();
 
@@ -53,6 +68,8 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (recording) recording.stopAndUnloadAsync();
+      if (recordingTimer.current) clearInterval(recordingTimer.current);
     };
   }, [contactId, user]);
 
@@ -97,9 +114,17 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       const contentToSend = newMessage.trim();
       setNewMessage('');
       
-      const savedMsg = await messageService.sendMessage(user.id, contactId, contentToSend);
-      if (savedMsg) {
-        setMessages(prev => prev.map(m => m.id === tempMsg.id ? savedMsg : m));
+      let savedMsg: any;
+      if (editingMessage) {
+        await messageService.updateMessage(editingMessage.id, user.id, contentToSend);
+        savedMsg = { ...editingMessage, content: contentToSend };
+        setMessages(prev => prev.map(m => m.id === editingMessage.id ? savedMsg : m));
+        setEditingMessage(null);
+      } else {
+        savedMsg = await messageService.sendMessage(user.id, contactId, contentToSend);
+        if (savedMsg) {
+          setMessages(prev => prev.map(m => m.id === tempMsg.id ? savedMsg : m));
+        }
       }
     } catch (e) {
       console.warn('Failed to send message:', e);
@@ -151,27 +176,126 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(recording);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimer.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording || !user) return;
+    setIsRecording(false);
+    if (recordingTimer.current) clearInterval(recordingTimer.current);
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      if (uri) {
+        setIsUploading(true);
+        const media = await messageService.uploadChatMedia(uri, 'audio/m4a');
+        if (media) {
+          await messageService.sendMessage(user.id, contactId, 'Tin nhắn thoại', media.url, media.type);
+        }
+        setIsUploading(false);
+      }
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+      setIsUploading(false);
+    }
+    setRecording(null);
+  };
+
+  const handleLongPressMessage = (msg: ChatMessage) => {
+    setSelectedMessage(msg);
+    setShowContextMenu(true);
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!selectedMessage || !user) return;
+    try {
+      await messageService.deleteMessage(selectedMessage.id, user.id);
+      setMessages(prev => prev.map(m => m.id === selectedMessage.id ? { ...m, content: 'Tin nhắn đã được thu hồi', media_url: undefined, media_type: undefined } : m));
+    } catch (e) {
+      console.warn('Delete failed', e);
+    }
+    setShowContextMenu(false);
+    setSelectedMessage(null);
+  };
+
+  const handleEditMessage = () => {
+    if (!selectedMessage) return;
+    setEditingMessage(selectedMessage);
+    setNewMessage(selectedMessage.content);
+    setShowContextMenu(false);
+  };
+
+  const handleReact = async (reaction: string) => {
+    if (!selectedMessage || !user) return;
+    try {
+      await messageService.reactToMessage(selectedMessage.id, user.id, reaction);
+      // Optimistic
+      setMessages(prev => prev.map(m => {
+        if (m.id === selectedMessage.id) {
+          const reactions = m.reactions || {};
+          let list = reactions[reaction] || [];
+          if (list.includes(user.id)) list = list.filter(id => id !== user.id);
+          else list = [...list, user.id];
+          return { ...m, reactions: { ...reactions, [reaction]: list } };
+        }
+        return m;
+      }));
+    } catch (e) {
+      console.warn(e);
+    }
+    setShowContextMenu(false);
+    setSelectedMessage(null);
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isMe = item.sender_id === user?.id;
+    const hasReactions = item.reactions && Object.keys(item.reactions).length > 0;
     
     return (
       <View style={[styles.messageWrapper, isMe ? styles.messageWrapperMe : styles.messageWrapperOther]}>
         {!isMe && (
           <UserAvatar src={contactAvatar} name={contactName} style={styles.messageAvatar} />
         )}
-        <View style={isMe ? styles.messageBubbleMeContainer : [styles.messageBubble, styles.messageBubbleOther]}>
+        <TouchableOpacity 
+          onLongPress={() => handleLongPressMessage(item)} 
+          delayLongPress={300}
+          activeOpacity={0.9}
+          style={isMe ? styles.messageBubbleMeContainer : [styles.messageBubble, styles.messageBubbleOther]}
+        >
           {isMe ? (
             <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.messageBubbleMe}>
               {item.media_url && item.media_type === 'image' && (
                 <Image source={{ uri: item.media_url }} style={styles.messageMedia} contentFit="cover" />
               )}
-              {item.media_url && item.media_type !== 'image' && (
+              {item.media_url && item.media_type === 'audio' && (
+                <View style={styles.fileAttachmentContainer}>
+                  <Ionicons name="mic-circle-outline" size={32} color="#fff" />
+                  <Text style={styles.fileAttachmentText}>Tin nhắn thoại</Text>
+                </View>
+              )}
+              {item.media_url && item.media_type !== 'image' && item.media_type !== 'audio' && (
                 <View style={styles.fileAttachmentContainer}>
                   <Ionicons name="document-outline" size={24} color="#fff" />
                   <Text style={styles.fileAttachmentText}>Tệp đính kèm</Text>
                 </View>
               )}
-              <Text style={[styles.messageText, styles.messageTextMe]}>
+              <Text style={[styles.messageText, styles.messageTextMe, item.content === 'Tin nhắn đã được thu hồi' && { fontStyle: 'italic', opacity: 0.8 }]}>
                 {item.content}
               </Text>
               <View style={styles.messageStatusRow}>
@@ -186,13 +310,19 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
               {item.media_url && item.media_type === 'image' && (
                 <Image source={{ uri: item.media_url }} style={styles.messageMedia} contentFit="cover" />
               )}
-              {item.media_url && item.media_type !== 'image' && (
+              {item.media_url && item.media_type === 'audio' && (
+                <View style={[styles.fileAttachmentContainer, { backgroundColor: '#e5e7eb' }]}>
+                  <Ionicons name="mic-circle-outline" size={32} color={colors.textSecondary} />
+                  <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>Tin nhắn thoại</Text>
+                </View>
+              )}
+              {item.media_url && item.media_type !== 'image' && item.media_type !== 'audio' && (
                 <View style={[styles.fileAttachmentContainer, { backgroundColor: '#e5e7eb' }]}>
                   <Ionicons name="document-outline" size={24} color={colors.textSecondary} />
                   <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>Tệp đính kèm</Text>
                 </View>
               )}
-              <Text style={[styles.messageText, styles.messageTextOther]}>
+              <Text style={[styles.messageText, styles.messageTextOther, item.content === 'Tin nhắn đã được thu hồi' && { fontStyle: 'italic', opacity: 0.8 }]}>
                 {item.content}
               </Text>
               <Text style={styles.messageTimeTextOther}>
@@ -200,7 +330,18 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
               </Text>
             </View>
           )}
-        </View>
+
+          {/* Reactions */}
+          {hasReactions && (
+            <View style={[styles.reactionsContainer, isMe ? styles.reactionsMe : styles.reactionsOther]}>
+              {Object.entries(item.reactions!).map(([r, users]) => (
+                <View key={r} style={styles.reactionBadge}>
+                  <Text style={styles.reactionText}>{r} {users.length > 1 ? users.length : ''}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
     );
   };
@@ -227,13 +368,29 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => navigation.navigate('Call', { contactId, contactName, contactAvatar, isVideo: false })}
+            onPress={() => {
+              if (Constants.appOwnership === 'expo') {
+                import('react-native').then(({ Alert }) => {
+                  Alert.alert('Không khả dụng', 'Tính năng Gọi Video/Audio Native không hỗ trợ trên ứng dụng Expo Go. Vui lòng build Dev Client để thử nghiệm.');
+                });
+                return;
+              }
+              navigation.navigate('Call', { contactId, contactName, contactAvatar, isVideo: false })
+            }}
           >
             <Ionicons name="call-outline" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => navigation.navigate('Call', { contactId, contactName, contactAvatar, isVideo: true })}
+            onPress={() => {
+              if (Constants.appOwnership === 'expo') {
+                import('react-native').then(({ Alert }) => {
+                  Alert.alert('Không khả dụng', 'Tính năng Gọi Video/Audio Native không hỗ trợ trên ứng dụng Expo Go. Vui lòng build Dev Client để thử nghiệm.');
+                });
+                return;
+              }
+              navigation.navigate('Call', { contactId, contactName, contactAvatar, isVideo: true })
+            }}
           >
             <Ionicons name="videocam-outline" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -262,35 +419,102 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       )}
 
       {/* Input */}
+      {editingMessage && (
+        <View style={styles.editingBanner}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.editingTitle}>Đang sửa tin nhắn</Text>
+            <Text style={styles.editingDesc} numberOfLines={1}>{editingMessage.content}</Text>
+          </View>
+          <TouchableOpacity onPress={() => { setEditingMessage(null); setNewMessage(''); }}>
+            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+      
       <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.attachButton} onPress={handlePickImage} disabled={isUploading}>
-          <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument} disabled={isUploading}>
-          <Ionicons name="attach-outline" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Nhắn tin..."
-          value={newMessage}
-          onChangeText={setNewMessage}
-          multiline
-          maxLength={500}
-          placeholderTextColor={colors.textTertiary}
-        />
-        <TouchableOpacity 
-          style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
-          onPress={handleSendMessage}
-          disabled={!newMessage.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="send" size={16} color="#fff" />
-          )}
-        </TouchableOpacity>
+        {!isRecording ? (
+          <>
+            <TouchableOpacity style={styles.attachButton} onPress={handlePickImage} disabled={isUploading}>
+              <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument} disabled={isUploading}>
+              <Ionicons name="attach-outline" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Nhắn tin..."
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={500}
+              placeholderTextColor={colors.textTertiary}
+            />
+            {newMessage.trim() || editingMessage ? (
+              <TouchableOpacity 
+                style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+                onPress={handleSendMessage}
+                disabled={!newMessage.trim() || sending}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={16} color="#fff" />
+                )}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={styles.micButton}
+                onPressIn={startRecording}
+                onPressOut={stopRecording}
+                disabled={isUploading}
+              >
+                <Ionicons name="mic" size={22} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </>
+        ) : (
+          <View style={styles.recordingContainer}>
+            <View style={styles.recordingIndicator} />
+            <Text style={styles.recordingText}>
+              Đang ghi âm... {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+            </Text>
+            <Text style={styles.recordingHint}>Thả ra để gửi</Text>
+          </View>
+        )}
       </View>
       </KeyboardAvoidingView>
+
+      {/* Context Menu Modal */}
+      <Modal visible={showContextMenu} animationType="fade" transparent={true} onRequestClose={() => setShowContextMenu(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowContextMenu(false)}>
+          <View style={styles.contextMenu}>
+            <View style={styles.emojiRow}>
+              {['❤️', '👍', '😆', '😮', '😢', '😡'].map(emoji => (
+                <TouchableOpacity key={emoji} onPress={() => handleReact(emoji)} style={styles.emojiBtn}>
+                  <Text style={styles.emojiText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.contextDivider} />
+            {selectedMessage?.sender_id === user?.id && selectedMessage?.content !== 'Tin nhắn đã được thu hồi' && (
+              <>
+                <TouchableOpacity style={styles.contextActionBtn} onPress={handleEditMessage}>
+                  <Ionicons name="pencil-outline" size={20} color={colors.text} />
+                  <Text style={styles.contextActionText}>Chỉnh sửa tin nhắn</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.contextActionBtn} onPress={handleDeleteMessage}>
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                  <Text style={[styles.contextActionText, { color: colors.error }]}>Thu hồi tin nhắn</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity style={styles.contextActionBtn} onPress={() => setShowContextMenu(false)}>
+              <Ionicons name="close-outline" size={20} color={colors.text} />
+              <Text style={styles.contextActionText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Info Modal */}
       <Modal
@@ -560,5 +784,128 @@ const styles = StyleSheet.create({
     fontSize: typography.sm,
     color: colors.textSecondary,
     fontWeight: typography.medium,
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    padding: spacing.sm,
+    paddingHorizontal: spacing.base,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  editingTitle: {
+    fontSize: 12,
+    fontWeight: typography.bold,
+    color: colors.primary,
+  },
+  editingDesc: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  micButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3b82f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+    marginBottom: 2,
+  },
+  recordingContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fef2f2',
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    height: 40,
+  },
+  recordingIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.error,
+  },
+  recordingText: {
+    fontSize: typography.base,
+    color: colors.error,
+    fontWeight: typography.medium,
+  },
+  recordingHint: {
+    fontSize: 12,
+    color: colors.textTertiary,
+  },
+  contextMenu: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: spacing.md,
+    width: '80%',
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+  },
+  emojiRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: spacing.sm,
+  },
+  emojiBtn: {
+    padding: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
+  },
+  emojiText: {
+    fontSize: 24,
+  },
+  contextDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
+  contextActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  contextActionText: {
+    fontSize: typography.base,
+    color: colors.text,
+  },
+  reactionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: -10,
+    zIndex: 2,
+    gap: 4,
+  },
+  reactionsMe: {
+    alignSelf: 'flex-start',
+    marginLeft: 12,
+  },
+  reactionsOther: {
+    alignSelf: 'flex-end',
+    marginRight: 12,
+  },
+  reactionBadge: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  reactionText: {
+    fontSize: 10,
+    color: colors.text,
   },
 });
