@@ -72,10 +72,13 @@ export default function App() {
       linkingSubscription.remove();
     };
   }, []);
-
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar 
+        barStyle="dark-content" 
+        backgroundColor="#ffffff" 
+        translucent={false} 
+      />
       <QueryClientProvider client={queryClient}>
         <AppNavigator />
       </QueryClientProvider>
