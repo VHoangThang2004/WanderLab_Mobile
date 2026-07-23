@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, useNavigation, createNavigationContainerRef } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -54,6 +54,9 @@ import { CheckoutScreen } from '../screens/subscription/CheckoutScreen';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../hooks/useTheme';
 import { colors as staticColors, gradients } from '../theme';
+import { webrtcService, SignalPayload } from '../api/webrtcService';
+
+export const navigationRef = createNavigationContainerRef<any>();
 
 const AuthStack = createNativeStackNavigator();
 const MainStack = createNativeStackNavigator();
@@ -267,20 +270,40 @@ function AuthNavigator() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates, refreshSession } = useAuthStore();
+  const { isAuthenticated, user, subscribeToProfileUpdates, unsubscribeFromProfileUpdates, refreshSession } = useAuthStore();
   const { isDarkMode, colors } = useTheme();
 
   useEffect(() => {
     if (isAuthenticated) {
       refreshSession();
       subscribeToProfileUpdates();
+
+      if (user?.id) {
+        webrtcService.init(user.id, (payload: SignalPayload) => {
+          if (payload.type === 'offer') {
+            if (navigationRef.isReady()) {
+              navigationRef.navigate('Call', {
+                contactId: payload.callerId,
+                contactName: payload.callerName,
+                contactAvatar: payload.callerAvatar,
+                isVideo: payload.isVideo,
+                isIncoming: true,
+                incomingOffer: payload.sdp
+              });
+            }
+          }
+        });
+      }
+
     } else {
       unsubscribeFromProfileUpdates();
+      webrtcService.cleanup();
     }
     return () => {
       unsubscribeFromProfileUpdates();
+      webrtcService.cleanup();
     };
-  }, [isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates, refreshSession]);
+  }, [isAuthenticated, subscribeToProfileUpdates, unsubscribeFromProfileUpdates, refreshSession, user?.id]);
 
   const navigationTheme = isDarkMode ? DarkTheme : DefaultTheme;
   const customTheme = {
@@ -305,7 +328,7 @@ export function AppNavigator() {
   };
 
   return (
-    <NavigationContainer theme={customTheme} linking={linking}>
+    <NavigationContainer ref={navigationRef} theme={customTheme} linking={linking}>
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
