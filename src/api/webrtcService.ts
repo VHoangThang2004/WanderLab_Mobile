@@ -15,13 +15,28 @@ class WebRTCService {
   private channel: RealtimeChannel | null = null;
   public currentUserId: string | null = null;
   private listeners: Set<(payload: SignalPayload) => void> = new Set();
+  
+  // Cache to store ice-candidates that arrive before CallScreen mounts
+  private signalBuffer: SignalPayload[] = [];
 
   addListener(listener: (payload: SignalPayload) => void) {
     this.listeners.add(listener);
+    // Send buffered signals to the new listener
+    this.signalBuffer.forEach(payload => listener(payload));
   }
 
   removeListener(listener: (payload: SignalPayload) => void) {
     this.listeners.delete(listener);
+  }
+
+  consumeBuffer() {
+    const buffer = [...this.signalBuffer];
+    this.signalBuffer = [];
+    return buffer;
+  }
+
+  clearBuffer() {
+    this.signalBuffer = [];
   }
 
   init(userId: string, onSignal?: (payload: SignalPayload) => void) {
@@ -38,7 +53,14 @@ class WebRTCService {
     this.channel = supabase.channel(`webrtc:${userId}`);
     
     this.channel.on('broadcast', { event: 'webrtc-signal' }, (payload) => {
-      this.listeners.forEach(listener => listener(payload.payload as SignalPayload));
+      const signalPayload = payload.payload as SignalPayload;
+      
+      // If only AppNavigator is listening (size === 1) and it's an ice-candidate, buffer it
+      if (this.listeners.size <= 1 && signalPayload.type === 'ice-candidate') {
+        this.signalBuffer.push(signalPayload);
+      }
+      
+      this.listeners.forEach(listener => listener(signalPayload));
     });
 
     this.channel.subscribe();

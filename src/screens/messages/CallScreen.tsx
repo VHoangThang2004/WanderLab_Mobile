@@ -40,6 +40,8 @@ export function CallScreen({ route, navigation }: any) {
   const [duration, setDuration] = useState(0);
 
   const pc = useRef<RTCPeerConnection | null>(null);
+  const iceCandidateQueue = useRef<RTCIceCandidate[]>([]);
+  const isRemoteDescriptionSet = useRef(false);
 
   useEffect(() => {
     // Add signal listener
@@ -51,12 +53,25 @@ export function CallScreen({ route, navigation }: any) {
         case 'answer':
           if (pc.current && payload.sdp) {
             await pc.current.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            isRemoteDescriptionSet.current = true;
+            
+            // Flush ICE queue
+            for (const candidate of iceCandidateQueue.current) {
+              await pc.current.addIceCandidate(candidate);
+            }
+            iceCandidateQueue.current = [];
+            
             setCallStatus('Đã kết nối');
           }
           break;
         case 'ice-candidate':
-          if (pc.current && payload.candidate) {
-            await pc.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          if (payload.candidate) {
+            const rtcCandidate = new RTCIceCandidate(payload.candidate);
+            if (pc.current && isRemoteDescriptionSet.current) {
+              await pc.current.addIceCandidate(rtcCandidate);
+            } else {
+              iceCandidateQueue.current.push(rtcCandidate);
+            }
           }
           break;
         case 'end-call':
@@ -147,6 +162,14 @@ export function CallScreen({ route, navigation }: any) {
     
     if (incomingOffer) {
       await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
+      isRemoteDescriptionSet.current = true;
+      
+      // Flush ICE queue
+      for (const candidate of iceCandidateQueue.current) {
+        await peerConnection.addIceCandidate(candidate);
+      }
+      iceCandidateQueue.current = [];
+
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
 
@@ -167,6 +190,7 @@ export function CallScreen({ route, navigation }: any) {
     
     return () => {
       // Cleanup on unmount
+      webrtcService.clearBuffer();
       if (localStream) {
         localStream.getTracks().forEach((t: any) => t.stop());
       }
