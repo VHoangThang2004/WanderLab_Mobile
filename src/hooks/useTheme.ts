@@ -6,7 +6,7 @@ export function useTheme() {
   const { mode } = useThemeStore();
   const systemColorScheme = useColorScheme();
 
-  const isDarkMode = mode === 'dark' || (mode === 'system' && systemColorScheme === 'dark');
+  const isDarkMode = false;
 
   const themeColors = {
     primary: baseColors.primary,

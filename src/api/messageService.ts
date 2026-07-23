@@ -150,7 +150,7 @@ export const messageService = {
       const { data } = supabase.storage.from('chat_media').getPublicUrl(filePath);
       return {
         url: data.publicUrl,
-        type: type.startsWith('image/') ? 'image' : 'file'
+        type: type.startsWith('image/') ? 'image' : type.startsWith('video/') ? 'video' : type.startsWith('audio/') ? 'audio' : 'file'
       };
     } catch (error) {
       console.error('Error uploading media:', error);

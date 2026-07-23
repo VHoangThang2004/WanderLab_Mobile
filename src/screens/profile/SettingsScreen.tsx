@@ -135,12 +135,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
             subtitle={language === 'vi' ? 'Tiếng Việt' : 'English'}
             onPress={() => setActiveModal('language')}
           />
-          <SettingItem
-            icon={isDarkMode ? 'moon-outline' : 'sunny-outline'}
-            title={t('settings.theme')}
-            subtitle={mode === 'system' ? t('settings.themeSystem') : mode === 'dark' ? t('settings.themeDark') : t('settings.themeLight')}
-            onPress={() => setActiveModal('theme')}
-          />
+
         </View>
 
         <View style={styles.section}>
@@ -246,32 +241,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
         </View>
       </Modal>
 
-      {/* Theme Modal */}
-      <Modal visible={activeModal === 'theme'} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>{t('settings.theme')}</Text>
-            <TouchableOpacity style={styles.dialogOption} onPress={() => { setMode('light'); setActiveModal(null); }}>
-              <Text style={styles.dialogOptionText}>{t('settings.themeLight')}</Text>
-              {mode === 'light' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-            <View style={styles.dialogDivider} />
-            <TouchableOpacity style={styles.dialogOption} onPress={() => { setMode('dark'); setActiveModal(null); }}>
-              <Text style={styles.dialogOptionText}>{t('settings.themeDark')}</Text>
-              {mode === 'dark' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-            <View style={styles.dialogDivider} />
-            <TouchableOpacity style={styles.dialogOption} onPress={() => { setMode('system'); setActiveModal(null); }}>
-              <Text style={styles.dialogOptionText}>{t('settings.themeSystem')}</Text>
-              {mode === 'system' && <Ionicons name="checkmark" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-            <View style={styles.dialogDivider} />
-            <TouchableOpacity style={styles.dialogCancel} onPress={() => setActiveModal(null)}>
-              <Text style={styles.cancelText}>{t('settings.cancel')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+
 
     </SafeAreaView>
   );

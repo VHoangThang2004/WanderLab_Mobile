@@ -16,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import Constants from 'expo-constants';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 
 interface ChatScreenProps {
   route: any;
@@ -39,11 +39,16 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimer = useRef<NodeJS.Timeout | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   // CRUD state
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [fullScreenVideo, setFullScreenVideo] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -68,8 +73,10 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
 
     return () => {
       if (channel) supabase.removeChannel(channel);
-      if (recording) recording.stopAndUnloadAsync();
+      if (recordingRef.current) recordingRef.current.stopAndUnloadAsync().catch(()=>{});
+      else if (recording) recording.stopAndUnloadAsync().catch(()=>{});
       if (recordingTimer.current) clearInterval(recordingTimer.current);
+      if (soundRef.current) soundRef.current.unloadAsync().catch(()=>{});
     };
   }, [contactId, user]);
 
@@ -178,13 +185,18 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
 
   const startRecording = async () => {
     try {
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync().catch(()=>{});
+        recordingRef.current = null;
+      }
       await Audio.requestPermissionsAsync();
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(recording);
+      const { recording: newRecording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = newRecording;
+      setRecording(newRecording);
       setIsRecording(true);
       setRecordingDuration(0);
       recordingTimer.current = setInterval(() => {
@@ -192,16 +204,21 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       }, 1000);
     } catch (err) {
       console.error('Failed to start recording', err);
+      setIsRecording(false);
     }
   };
 
   const stopRecording = async () => {
-    if (!recording || !user) return;
+    const currentRec = recordingRef.current || recording;
+    if (!currentRec || !user) {
+      setIsRecording(false);
+      return;
+    }
     setIsRecording(false);
     if (recordingTimer.current) clearInterval(recordingTimer.current);
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      await currentRec.stopAndUnloadAsync();
+      const uri = currentRec.getURI();
       if (uri) {
         setIsUploading(true);
         const media = await messageService.uploadChatMedia(uri, 'audio/m4a');
@@ -215,6 +232,7 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       setIsUploading(false);
     }
     setRecording(null);
+    recordingRef.current = null;
   };
 
   const handleLongPressMessage = (msg: ChatMessage) => {
@@ -263,16 +281,73 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
     setSelectedMessage(null);
   };
 
+  const handlePressMessage = async (msg: ChatMessage) => {
+    if (!msg.media_url) return;
+
+    const isAudio = msg.media_type === 'audio' || (msg.media_type === 'file' && msg.media_url.includes('.m4a'));
+    const isImage = msg.media_type === 'image' || (msg.media_type === 'file' && (msg.media_url.includes('.jpg') || msg.media_url.includes('.png') || msg.media_url.includes('.jpeg')));
+    const isVideo = msg.media_type === 'video' || (msg.media_type === 'file' && msg.media_url.includes('.mp4'));
+
+    if (isAudio) {
+      try {
+        if (soundRef.current && playingAudioId === msg.id) {
+          await soundRef.current.stopAsync().catch(()=>{});
+          await soundRef.current.unloadAsync().catch(()=>{});
+          soundRef.current = null;
+          setPlayingAudioId(null);
+          return;
+        }
+
+        if (soundRef.current) {
+          await soundRef.current.stopAsync().catch(()=>{});
+          await soundRef.current.unloadAsync().catch(()=>{});
+          soundRef.current = null;
+        }
+
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: msg.media_url },
+          { shouldPlay: true }
+        );
+        soundRef.current = sound;
+        setPlayingAudioId(msg.id);
+
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            sound.unloadAsync().catch(()=>{});
+            soundRef.current = null;
+            setPlayingAudioId(null);
+          }
+        });
+      } catch (e) {
+        console.warn('Cannot play audio', e);
+      }
+    } else if (isImage) {
+      setFullScreenImage(msg.media_url);
+    } else if (isVideo) {
+      setFullScreenVideo(msg.media_url);
+    } else {
+      import('expo-linking').then(({ openURL }) => {
+        openURL(msg.media_url!).catch(e => console.warn(e));
+      });
+    }
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isMe = item.sender_id === user?.id;
     const hasReactions = item.reactions && Object.keys(item.reactions).length > 0;
     
+    const isAudio = item.media_type === 'audio' || (item.media_type === 'file' && item.media_url?.includes('.m4a'));
+    const isImage = item.media_type === 'image' || (item.media_type === 'file' && (item.media_url?.includes('.jpg') || item.media_url?.includes('.png') || item.media_url?.includes('.jpeg')));
+    const isVideo = item.media_type === 'video' || (item.media_type === 'file' && item.media_url?.includes('.mp4'));
+    const isOther = !!item.media_url && !isAudio && !isImage && !isVideo;
+
     return (
       <View style={[styles.messageWrapper, isMe ? styles.messageWrapperMe : styles.messageWrapperOther]}>
         {!isMe && (
           <UserAvatar src={contactAvatar} name={contactName} style={styles.messageAvatar} />
         )}
         <TouchableOpacity 
+          onPress={() => handlePressMessage(item)}
           onLongPress={() => handleLongPressMessage(item)} 
           delayLongPress={300}
           activeOpacity={0.9}
@@ -280,16 +355,24 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
         >
           {isMe ? (
             <LinearGradient colors={['#ff3131', '#ff914d']} style={styles.messageBubbleMe}>
-              {item.media_url && item.media_type === 'image' && (
+              {item.media_url && isImage && (
                 <Image source={{ uri: item.media_url }} style={styles.messageMedia} contentFit="cover" />
               )}
-              {item.media_url && item.media_type === 'audio' && (
+              {item.media_url && isVideo && (
                 <View style={styles.fileAttachmentContainer}>
-                  <Ionicons name="mic-circle-outline" size={32} color="#fff" />
-                  <Text style={styles.fileAttachmentText}>Tin nhắn thoại</Text>
+                  <Ionicons name="videocam-outline" size={32} color="#fff" />
+                  <Text style={styles.fileAttachmentText}>Video đính kèm</Text>
                 </View>
               )}
-              {item.media_url && item.media_type !== 'image' && item.media_type !== 'audio' && (
+              {item.media_url && isAudio && (
+                <View style={styles.fileAttachmentContainer}>
+                  <Ionicons name={playingAudioId === item.id ? "pause-circle-outline" : "play-circle-outline"} size={32} color="#fff" />
+                  <Text style={styles.fileAttachmentText}>
+                    {playingAudioId === item.id ? "Đang phát..." : "Tin nhắn thoại"}
+                  </Text>
+                </View>
+              )}
+              {item.media_url && isOther && (
                 <View style={styles.fileAttachmentContainer}>
                   <Ionicons name="document-outline" size={24} color="#fff" />
                   <Text style={styles.fileAttachmentText}>Tệp đính kèm</Text>
@@ -307,16 +390,24 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
             </LinearGradient>
           ) : (
             <View>
-              {item.media_url && item.media_type === 'image' && (
+              {item.media_url && isImage && (
                 <Image source={{ uri: item.media_url }} style={styles.messageMedia} contentFit="cover" />
               )}
-              {item.media_url && item.media_type === 'audio' && (
+              {item.media_url && isVideo && (
                 <View style={[styles.fileAttachmentContainer, { backgroundColor: '#e5e7eb' }]}>
-                  <Ionicons name="mic-circle-outline" size={32} color={colors.textSecondary} />
-                  <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>Tin nhắn thoại</Text>
+                  <Ionicons name="videocam-outline" size={32} color={colors.textSecondary} />
+                  <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>Video đính kèm</Text>
                 </View>
               )}
-              {item.media_url && item.media_type !== 'image' && item.media_type !== 'audio' && (
+              {item.media_url && isAudio && (
+                <View style={[styles.fileAttachmentContainer, { backgroundColor: '#e5e7eb' }]}>
+                  <Ionicons name={playingAudioId === item.id ? "pause-circle-outline" : "play-circle-outline"} size={32} color={colors.textSecondary} />
+                  <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>
+                    {playingAudioId === item.id ? "Đang phát..." : "Tin nhắn thoại"}
+                  </Text>
+                </View>
+              )}
+              {item.media_url && isOther && (
                 <View style={[styles.fileAttachmentContainer, { backgroundColor: '#e5e7eb' }]}>
                   <Ionicons name="document-outline" size={24} color={colors.textSecondary} />
                   <Text style={[styles.fileAttachmentText, { color: colors.textSecondary }]}>Tệp đính kèm</Text>
@@ -432,7 +523,7 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       )}
       
       <View style={styles.inputContainer}>
-        {!isRecording ? (
+        {!isRecording && (
           <>
             <TouchableOpacity style={styles.attachButton} onPress={handlePickImage} disabled={isUploading}>
               <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
@@ -449,37 +540,40 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
               maxLength={500}
               placeholderTextColor={colors.textTertiary}
             />
-            {newMessage.trim() || editingMessage ? (
-              <TouchableOpacity 
-                style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
-                onPress={handleSendMessage}
-                disabled={!newMessage.trim() || sending}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={16} color="#fff" />
-                )}
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={styles.micButton}
-                onPressIn={startRecording}
-                onPressOut={stopRecording}
-                disabled={isUploading}
-              >
-                <Ionicons name="mic" size={22} color="#fff" />
-              </TouchableOpacity>
-            )}
           </>
-        ) : (
-          <View style={styles.recordingContainer}>
+        )}
+
+        {isRecording && (
+          <View style={[styles.recordingContainer, { flex: 1, marginRight: 8 }]}>
             <View style={styles.recordingIndicator} />
             <Text style={styles.recordingText}>
               Đang ghi âm... {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
             </Text>
-            <Text style={styles.recordingHint}>Thả ra để gửi</Text>
+            <Text style={styles.recordingHint}>Thả nút để gửi</Text>
           </View>
+        )}
+
+        {newMessage.trim() || editingMessage ? (
+          <TouchableOpacity 
+            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+            onPress={handleSendMessage}
+            disabled={!newMessage.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="send" size={16} color="#fff" />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.micButton, isRecording && { transform: [{ scale: 1.2 }], backgroundColor: '#ef4444' }]}
+            onPressIn={startRecording}
+            onPressOut={stopRecording}
+            disabled={isUploading}
+          >
+            <Ionicons name="mic" size={22} color="#fff" />
+          </TouchableOpacity>
         )}
       </View>
       </KeyboardAvoidingView>
@@ -551,6 +645,36 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
               </View>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Full Screen Image Modal */}
+      <Modal visible={!!fullScreenImage} transparent={true} animationType="fade" onRequestClose={() => setFullScreenImage(null)}>
+        <View style={styles.fullScreenModal}>
+          <TouchableOpacity style={styles.fullScreenCloseBtn} onPress={() => setFullScreenImage(null)}>
+            <Ionicons name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {fullScreenImage && (
+            <Image source={{ uri: fullScreenImage }} style={styles.fullScreenMedia} contentFit="contain" />
+          )}
+        </View>
+      </Modal>
+
+      {/* Full Screen Video Modal */}
+      <Modal visible={!!fullScreenVideo} transparent={true} animationType="fade" onRequestClose={() => setFullScreenVideo(null)}>
+        <View style={styles.fullScreenModal}>
+          <TouchableOpacity style={styles.fullScreenCloseBtn} onPress={() => setFullScreenVideo(null)}>
+            <Ionicons name="close" size={32} color="#fff" />
+          </TouchableOpacity>
+          {fullScreenVideo && (
+            <Video
+              source={{ uri: fullScreenVideo }}
+              style={styles.fullScreenMedia}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay
+            />
+          )}
         </View>
       </Modal>
     </SafeAreaView>
@@ -907,5 +1031,24 @@ const styles = StyleSheet.create({
   reactionText: {
     fontSize: 10,
     color: colors.text,
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 24,
+  },
+  fullScreenMedia: {
+    width: '100%',
+    height: '100%',
   },
 });
