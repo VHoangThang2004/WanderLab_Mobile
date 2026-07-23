@@ -48,7 +48,12 @@ export function SubscriptionScreen({ navigation }: any) {
     try {
       const data = await paymentService.createCheckoutSession(planKey);
       if (data) {
-        setPaymentData(data); // Mở Modal thanh toán
+        // Cấp fallback cho amount và orderCode nếu backend (Edge function) chỉ trả về checkoutUrl
+        setPaymentData({
+          ...data,
+          amount: data.amount || (planKey === 'pro' ? 150000 : (planKey === 'plus' ? 50000 : 0)),
+          orderCode: data.orderCode || Date.now().toString().slice(-6)
+        });
       }
     } catch (error) {
       console.error(error);
