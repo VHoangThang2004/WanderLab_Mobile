@@ -68,7 +68,7 @@ export function SubscriptionScreen({ navigation }: any) {
     let url = request.url;
     
     // Bắt sự kiện thanh toán thành công / hủy từ PayOS
-    if (url.includes('subscription-success')) {
+    if (url.includes('payment-success')) {
       setShowWebview(false);
       
       // Cập nhật trạng thái user trong DB
@@ -86,7 +86,7 @@ export function SubscriptionScreen({ navigation }: any) {
       return false;
     }
 
-    if (url.includes('subscription-cancel')) {
+    if (url.includes('payment-cancel')) {
       setShowWebview(false);
       Alert.alert("Đã hủy", "Giao dịch thanh toán đã bị hủy.");
       return false;

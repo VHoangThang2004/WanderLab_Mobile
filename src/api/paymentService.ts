@@ -1,5 +1,6 @@
 import { Linking, Alert } from 'react-native';
 import CryptoJS from 'crypto-js';
+import { supabase } from '../lib/supabase';
 
 // Đọc thông tin từ .env (Expo xử lý tự động qua process.env)
 const PAYOS_CLIENT_ID = process.env.EXPO_PUBLIC_PAYOS_CLIENT_ID || '';
@@ -12,47 +13,21 @@ export const paymentService = {
    */
   async createCheckoutSession(planKey: string) {
     try {
-      // 1. Chuẩn bị dữ liệu
-      const amount = planKey === 'plus' ? 50000 : 150000;
-      const description = `WanderLab ${planKey}`;
-      const orderCode = Number(String(Date.now()).slice(-9)); // Tối đa 53 bit, lấy 9 số cuối
-      const returnUrl = 'exp://localhost:8081/--/subscription-success';
-      const cancelUrl = 'exp://localhost:8081/--/subscription-cancel';
-
-      // 2. Tạo signature theo đúng định dạng PayOS (Sắp xếp alphabet)
-      const dataStr = `amount=${amount}&cancelUrl=${cancelUrl}&description=${description}&orderCode=${orderCode}&returnUrl=${returnUrl}`;
-      const signature = CryptoJS.HmacSHA256(dataStr, PAYOS_CHECKSUM_KEY).toString(CryptoJS.enc.Hex);
-
-      const body = {
-        orderCode,
-        amount,
-        description,
-        cancelUrl,
-        returnUrl,
-        signature
-      };
-
-      // 3. Gọi API PayOS
-      const response = await fetch('https://api-merchant.payos.vn/v2/payment-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': PAYOS_CLIENT_ID,
-          'x-api-key': PAYOS_API_KEY
-        },
-        body: JSON.stringify(body)
+      // Gọi qua Edge Function giống Web để record vào database
+      const returnUrl = 'exp://localhost:8081/--'; // Sẽ tự thêm /payment-success và /payment-cancel ở backend
+      
+      const { data, error } = await supabase.functions.invoke("payos-create", {
+        body: { planKey, returnUrl }
       });
 
-      const resData = await response.json();
-
-      if (resData.code !== '00') {
-        throw new Error(resData.desc || 'Lỗi từ PayOS');
+      if (error) {
+        throw new Error(error.message || 'Lỗi từ Edge Function');
       }
 
-      if (resData.data) {
-        return resData.data;
+      if (data?.checkoutUrl) {
+        return data; // { checkoutUrl: '...' }
       } else {
-        throw new Error("Không nhận được dữ liệu thanh toán từ PayOS.");
+        throw new Error("Không nhận được dữ liệu thanh toán từ hệ thống.");
       }
     } catch (err: any) {
       console.error("Lỗi khi tạo PayOS session:", err);
