@@ -3,7 +3,7 @@
     "name": "WanderLab",
     "slug": "WanderLab_Mobile",
     "scheme": "wanderlab",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,21 +17,24 @@
     },
     "android": {
       "package": "com.wanderlab.mobile",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "b0920dec-d7d5-4084-937a-9b18316fde0e"
+        "projectId": "e584cc82-21c4-4685-a895-ebd9e1c0dda2"
       }
     },
     "plugins": [
@@ -45,6 +48,7 @@
         }
       ],
       "expo-web-browser"
-    ]
+    ],
+    "owner": "wanderlab-production"
   }
 }
