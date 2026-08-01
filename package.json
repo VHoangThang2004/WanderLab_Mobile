@@ -1,6 +1,6 @@
 {
   "name": "wanderlab_mobile",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "index.ts",
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^15.0.1",
